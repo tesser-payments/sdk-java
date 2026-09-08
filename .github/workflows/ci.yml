@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+      - name: Build + test + lint + binary-compat check
+        # :fixtures is excluded: it needs the Kotlin SDK in mavenLocal, which CI
+        # has no reason to build. Fixtures are committed; regenerate them locally.
+        run: ./gradlew :sdk:build spotlessCheck apiCheck --no-daemon --stacktrace
+      - name: Compile the examples
+        # The examples are the least-verified part of the deliverable -- the two
+        # rebalance-step ones are compile-verified only. If CI does not even
+        # compile them, a public-API change that breaks an example ships green.
+        run: |
+          ./gradlew \
+            :examples:create-wallet:build \
+            :examples:sign-rebalance-step-webhooks:build \
+            :examples:sign-rebalance-step-polling:build \
+            --no-daemon --stacktrace
+      - name: Upload test reports on failure
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-reports
+          path: |
+            sdk/build/reports/tests/
+            sdk/build/test-results/

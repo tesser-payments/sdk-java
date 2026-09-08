@@ -94,7 +94,11 @@ class TesserErrorTest {
                         .collect(java.util.stream.Collectors.toSet());
         assertThat(permitted)
                 .containsExactlyInAnyOrder(
-                        "ConfigError", "APIError", "ConnectionError", "TimeoutError", "SigningError");
+                        "ConfigError",
+                        "APIError",
+                        "ConnectionError",
+                        "TimeoutError",
+                        "SigningError");
     }
 
     @Test

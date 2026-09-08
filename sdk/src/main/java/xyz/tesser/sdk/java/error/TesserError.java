@@ -6,16 +6,14 @@ import java.util.Map;
 /**
  * Sealed root of every SDK error.
  *
- * <p>Extends {@link RuntimeException}, not {@link Exception}, deliberately. The
- * Kotlin source declares {@code TesserError : Exception}, but Kotlin has no
- * checked exceptions, so that is effectively unchecked. Transliterating the
- * literal supertype into Java would force {@code throws} clauses through every
- * caller and a try/catch inside every lambda handed to a CompletableFuture.
+ * <p>Extends {@link RuntimeException}, not {@link Exception}, deliberately. The Kotlin source
+ * declares {@code TesserError : Exception}, but Kotlin has no checked exceptions, so that is
+ * effectively unchecked. Transliterating the literal supertype into Java would force {@code throws}
+ * clauses through every caller and a try/catch inside every lambda handed to a CompletableFuture.
  *
- * <p>The signer throws {@link ConfigError} for bad caller input and
- * {@link SigningError} for cryptographic failures. {@link APIError},
- * {@link ConnectionError} and {@link TimeoutError} are part of the public
- * surface so future HTTP-issuing operations can throw them without a breaking
+ * <p>The signer throws {@link ConfigError} for bad caller input and {@link SigningError} for
+ * cryptographic failures. {@link APIError}, {@link ConnectionError} and {@link TimeoutError} are
+ * part of the public surface so future HTTP-issuing operations can throw them without a breaking
  * change.
  */
 public abstract sealed class TesserError extends RuntimeException
@@ -74,8 +72,8 @@ public abstract sealed class TesserError extends RuntimeException
     }
 
     /**
-     * Non-2xx HTTP from Tesser, carrying the parsed {@code errors[]} envelope.
-     * See https://docs.tesser.xyz/overviews/errors.
+     * Non-2xx HTTP from Tesser, carrying the parsed {@code errors[]} envelope. See
+     * https://docs.tesser.xyz/overviews/errors.
      */
     public static final class APIError extends TesserError {
         private final int status;

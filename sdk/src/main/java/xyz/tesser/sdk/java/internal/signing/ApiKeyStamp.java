@@ -31,9 +31,8 @@ import xyz.tesser.sdk.java.internal.util.Json;
  * }))
  * </pre>
  *
- * <p>Returned under the header name {@code X-Stamp}. Key loading, ECDSA signing
- * and DER encoding all use Bouncy Castle; only the JSON envelope and base64url
- * wrap are written here.
+ * <p>Returned under the header name {@code X-Stamp}. Key loading, ECDSA signing and DER encoding
+ * all use Bouncy Castle; only the JSON envelope and base64url wrap are written here.
  */
 final class ApiKeyStamp implements Stamp {
 
@@ -103,13 +102,12 @@ final class ApiKeyStamp implements Stamp {
     /**
      * ASCII-only hex, deliberately not {@link Character#digit}.
      *
-     * <p>{@code Character.digit} accepts Unicode digits and letters from other
-     * blocks: it returns 5 for U+0665 (Arabic-Indic five) and 10 for U+FF21
-     * (fullwidth A). The Kotlin SDK validates with
-     * {@code it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F'}, so it rejects
-     * those. Using Character.digit here would make the Java SDK silently accept a
-     * key the Kotlin SDK refuses and sign with a different scalar than the caller
-     * intended — precisely the wrong-signature failure this SDK is built to avoid.
+     * <p>{@code Character.digit} accepts Unicode digits and letters from other blocks: it returns 5
+     * for U+0665 (Arabic-Indic five) and 10 for U+FF21 (fullwidth A). The Kotlin SDK validates with
+     * {@code it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F'}, so it rejects those. Using
+     * Character.digit here would make the Java SDK silently accept a key the Kotlin SDK refuses and
+     * sign with a different scalar than the caller intended — precisely the wrong-signature failure
+     * this SDK is built to avoid.
      */
     private static int hexDigit(char c) {
         if (c >= '0' && c <= '9') {

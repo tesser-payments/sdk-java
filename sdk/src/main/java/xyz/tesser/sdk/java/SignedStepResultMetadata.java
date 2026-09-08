@@ -7,8 +7,8 @@ import java.util.Objects;
  *
  * @param stampHeaderName the stamp header name, typically {@code X-Stamp}
  * @param stampHeaderValue the base64url-encoded stamp value
- * @param body the exact JSON that was stamped (the Turnkey
- *     {@code ACTIVITY_TYPE_SIGN_TRANSACTION_V2} activity request)
+ * @param body the exact JSON that was stamped (the Turnkey {@code
+ *     ACTIVITY_TYPE_SIGN_TRANSACTION_V2} activity request)
  */
 public record SignedStepResultMetadata(
         String stampHeaderName, String stampHeaderValue, String body) {

@@ -39,7 +39,8 @@ class CreateWalletActivityTest {
         SignedResult result =
                 CreateWalletActivity.sign(
                                 CFG,
-                                new CreateWalletParams("test wallet", WalletType.STABLECOIN_ETHEREUM),
+                                new CreateWalletParams(
+                                        "test wallet", WalletType.STABLECOIN_ETHEREUM),
                                 mockStamp(),
                                 FIXED_CLOCK)
                         .get();

@@ -7,10 +7,10 @@ import xyz.tesser.sdk.java.WalletType;
 /**
  * Wallet type to account-spec lookup.
  *
- * <p>The Ethereum spec is verified end-to-end against Tesser staging. The Solana
- * and Stellar specs are NOT yet verified against the live API; if either fails
- * for a spec-related reason, file the API response so the spec can be adjusted.
- * This caveat is carried over verbatim from the Kotlin SDK.
+ * <p>The Ethereum spec is verified end-to-end against Tesser staging. The Solana and Stellar specs
+ * are NOT yet verified against the live API; if either fails for a spec-related reason, file the
+ * API response so the spec can be adjusted. This caveat is carried over verbatim from the Kotlin
+ * SDK.
  */
 public final class WalletTypeAccounts {
 

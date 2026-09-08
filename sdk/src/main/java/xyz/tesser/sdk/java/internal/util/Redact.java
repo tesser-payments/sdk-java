@@ -5,8 +5,8 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * Replaces secret-bearing values with {@code ***} in structured log payloads.
- * Used at every SDK log site that emits a map.
+ * Replaces secret-bearing values with {@code ***} in structured log payloads. Used at every SDK log
+ * site that emits a map.
  */
 public final class Redact {
 

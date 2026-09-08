@@ -5,11 +5,10 @@ import java.util.Objects;
 /**
  * Output of {@link LocalSigner#signStep}.
  *
- * @param signature base64-encoded JSON {@code {body, stamp}} where body is the
- *     Turnkey {@code ACTIVITY_TYPE_SIGN_TRANSACTION_V2} request. Submit as
- *     {@code {"signature": ...}} to
- *     {@code POST /v1/treasury/rebalances/{transferId}/steps/{stepId}/sign}.
- *     Tesser forwards the activity to Turnkey on the caller's behalf.
+ * @param signature base64-encoded JSON {@code {body, stamp}} where body is the Turnkey {@code
+ *     ACTIVITY_TYPE_SIGN_TRANSACTION_V2} request. Submit as {@code {"signature": ...}} to {@code
+ *     POST /v1/treasury/rebalances/{transferId}/steps/{stepId}/sign}. Tesser forwards the activity
+ *     to Turnkey on the caller's behalf.
  * @param unsignedTransaction echo of the input's unsignedTransaction, for audit trails
  * @param metadata diagnostic context; not required for the request itself
  */

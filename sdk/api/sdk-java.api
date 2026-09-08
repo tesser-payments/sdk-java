@@ -1,0 +1,160 @@
+public final record xyz.tesser.sdk.java.CreateWalletParams {
+    extends java.lang.Record
+    public final boolean xyz.tesser.sdk.java.CreateWalletParams.equals(java.lang.Object)
+    public final int xyz.tesser.sdk.java.CreateWalletParams.hashCode()
+    public final java.lang.String xyz.tesser.sdk.java.CreateWalletParams.toString()
+    public java.lang.String xyz.tesser.sdk.java.CreateWalletParams.name()
+    public xyz.tesser.sdk.java.CreateWalletParams(java.lang.String,xyz.tesser.sdk.java.WalletType)
+    public xyz.tesser.sdk.java.WalletType xyz.tesser.sdk.java.CreateWalletParams.type()
+}
+
+public final class xyz.tesser.sdk.java.LocalSigner {
+    extends java.lang.Object
+    public java.util.concurrent.CompletableFuture<xyz.tesser.sdk.java.SignedResult> xyz.tesser.sdk.java.LocalSigner.signCreateWallet(xyz.tesser.sdk.java.CreateWalletParams)
+    public java.util.concurrent.CompletableFuture<xyz.tesser.sdk.java.SignedStepResult> xyz.tesser.sdk.java.LocalSigner.signStep(xyz.tesser.sdk.java.StepForSigning)
+    public java.util.concurrent.CompletableFuture<xyz.tesser.sdk.java.SignedStepResult> xyz.tesser.sdk.java.LocalSigner.signStep(xyz.tesser.sdk.java.StepForSigning,xyz.tesser.sdk.java.SignStepOptions)
+    public xyz.tesser.sdk.java.LocalSigner(xyz.tesser.sdk.java.SigningConfig)
+    public xyz.tesser.sdk.java.SigningConfig xyz.tesser.sdk.java.LocalSigner.signing()
+}
+
+public final class xyz.tesser.sdk.java.SignStepOptions {
+    extends java.lang.Object
+    public xyz.tesser.sdk.java.SignStepOptions()
+}
+
+public final record xyz.tesser.sdk.java.SignedResult {
+    extends java.lang.Record
+    public final boolean xyz.tesser.sdk.java.SignedResult.equals(java.lang.Object)
+    public final int xyz.tesser.sdk.java.SignedResult.hashCode()
+    public final java.lang.String xyz.tesser.sdk.java.SignedResult.toString()
+    public java.lang.String xyz.tesser.sdk.java.SignedResult.signature()
+    public xyz.tesser.sdk.java.SignedResult(java.lang.String,xyz.tesser.sdk.java.SignedResultMetadata)
+    public xyz.tesser.sdk.java.SignedResultMetadata xyz.tesser.sdk.java.SignedResult.metadata()
+}
+
+public final record xyz.tesser.sdk.java.SignedResultMetadata {
+    extends java.lang.Record
+    public final boolean xyz.tesser.sdk.java.SignedResultMetadata.equals(java.lang.Object)
+    public final int xyz.tesser.sdk.java.SignedResultMetadata.hashCode()
+    public final java.lang.String xyz.tesser.sdk.java.SignedResultMetadata.toString()
+    public java.lang.String xyz.tesser.sdk.java.SignedResultMetadata.body()
+    public java.lang.String xyz.tesser.sdk.java.SignedResultMetadata.stampHeaderName()
+    public java.lang.String xyz.tesser.sdk.java.SignedResultMetadata.stampHeaderValue()
+    public xyz.tesser.sdk.java.SignedResultMetadata(java.lang.String,java.lang.String,java.lang.String)
+}
+
+public final record xyz.tesser.sdk.java.SignedStepResult {
+    extends java.lang.Record
+    public final boolean xyz.tesser.sdk.java.SignedStepResult.equals(java.lang.Object)
+    public final int xyz.tesser.sdk.java.SignedStepResult.hashCode()
+    public final java.lang.String xyz.tesser.sdk.java.SignedStepResult.toString()
+    public java.lang.String xyz.tesser.sdk.java.SignedStepResult.signature()
+    public java.lang.String xyz.tesser.sdk.java.SignedStepResult.unsignedTransaction()
+    public xyz.tesser.sdk.java.SignedStepResult(java.lang.String,java.lang.String,xyz.tesser.sdk.java.SignedStepResultMetadata)
+    public xyz.tesser.sdk.java.SignedStepResultMetadata xyz.tesser.sdk.java.SignedStepResult.metadata()
+}
+
+public final record xyz.tesser.sdk.java.SignedStepResultMetadata {
+    extends java.lang.Record
+    public final boolean xyz.tesser.sdk.java.SignedStepResultMetadata.equals(java.lang.Object)
+    public final int xyz.tesser.sdk.java.SignedStepResultMetadata.hashCode()
+    public final java.lang.String xyz.tesser.sdk.java.SignedStepResultMetadata.toString()
+    public java.lang.String xyz.tesser.sdk.java.SignedStepResultMetadata.body()
+    public java.lang.String xyz.tesser.sdk.java.SignedStepResultMetadata.stampHeaderName()
+    public java.lang.String xyz.tesser.sdk.java.SignedStepResultMetadata.stampHeaderValue()
+    public xyz.tesser.sdk.java.SignedStepResultMetadata(java.lang.String,java.lang.String,java.lang.String)
+}
+
+public final record xyz.tesser.sdk.java.SigningConfig {
+    extends java.lang.Record
+    public final boolean xyz.tesser.sdk.java.SigningConfig.equals(java.lang.Object)
+    public final int xyz.tesser.sdk.java.SigningConfig.hashCode()
+    public final java.lang.String xyz.tesser.sdk.java.SigningConfig.toString()
+    public java.lang.String xyz.tesser.sdk.java.SigningConfig.enclaveId()
+    public java.lang.String xyz.tesser.sdk.java.SigningConfig.privateKey()
+    public java.lang.String xyz.tesser.sdk.java.SigningConfig.publicKey()
+    public xyz.tesser.sdk.java.SigningConfig(java.lang.String,java.lang.String,java.lang.String)
+}
+
+public final record xyz.tesser.sdk.java.StepForSigning {
+    extends java.lang.Record
+    public final boolean xyz.tesser.sdk.java.StepForSigning.equals(java.lang.Object)
+    public final int xyz.tesser.sdk.java.StepForSigning.hashCode()
+    public final java.lang.String xyz.tesser.sdk.java.StepForSigning.toString()
+    public java.lang.String xyz.tesser.sdk.java.StepForSigning.id()
+    public java.lang.String xyz.tesser.sdk.java.StepForSigning.network()
+    public java.lang.String xyz.tesser.sdk.java.StepForSigning.signWith()
+    public java.lang.String xyz.tesser.sdk.java.StepForSigning.transferId()
+    public java.lang.String xyz.tesser.sdk.java.StepForSigning.unsignedTransaction()
+    public xyz.tesser.sdk.java.StepForSigning(java.lang.String,java.lang.String,java.lang.String,java.lang.String,java.lang.String)
+}
+
+public final enum xyz.tesser.sdk.java.WalletType {
+    extends java.lang.Enum<xyz.tesser.sdk.java.WalletType>
+    public java.lang.String xyz.tesser.sdk.java.WalletType.wireValue()
+    public static final xyz.tesser.sdk.java.WalletType xyz.tesser.sdk.java.WalletType.STABLECOIN_ETHEREUM
+    public static final xyz.tesser.sdk.java.WalletType xyz.tesser.sdk.java.WalletType.STABLECOIN_SOLANA
+    public static final xyz.tesser.sdk.java.WalletType xyz.tesser.sdk.java.WalletType.STABLECOIN_STELLAR
+    public static xyz.tesser.sdk.java.WalletType xyz.tesser.sdk.java.WalletType.fromWireValue(java.lang.String)
+    public static xyz.tesser.sdk.java.WalletType xyz.tesser.sdk.java.WalletType.valueOf(java.lang.String)
+    public static xyz.tesser.sdk.java.WalletType[] xyz.tesser.sdk.java.WalletType.values()
+}
+
+public abstract class xyz.tesser.sdk.java.error.TesserError {
+    extends java.lang.RuntimeException
+    permits xyz.tesser.sdk.java.error.TesserError$APIError
+    permits xyz.tesser.sdk.java.error.TesserError$ConfigError
+    permits xyz.tesser.sdk.java.error.TesserError$ConnectionError
+    permits xyz.tesser.sdk.java.error.TesserError$SigningError
+    permits xyz.tesser.sdk.java.error.TesserError$TimeoutError
+    protected xyz.tesser.sdk.java.error.TesserError(java.lang.String,java.lang.Throwable)
+}
+
+public static final class xyz.tesser.sdk.java.error.TesserError$APIError {
+    extends xyz.tesser.sdk.java.error.TesserError
+    public boolean xyz.tesser.sdk.java.error.TesserError$APIError.hasCode(java.lang.String...)
+    public int xyz.tesser.sdk.java.error.TesserError$APIError.status()
+    public java.lang.String xyz.tesser.sdk.java.error.TesserError$APIError.errorCode()
+    public java.lang.String xyz.tesser.sdk.java.error.TesserError$APIError.requestId()
+    public java.util.List<xyz.tesser.sdk.java.error.TesserErrorDetail> xyz.tesser.sdk.java.error.TesserError$APIError.errors()
+    public java.util.Map<java.lang.String, java.util.List<java.lang.String>> xyz.tesser.sdk.java.error.TesserError$APIError.headers()
+    public xyz.tesser.sdk.java.error.TesserError$APIError(java.lang.String,int)
+    public xyz.tesser.sdk.java.error.TesserError$APIError(java.lang.String,int,java.util.Map<java.lang.String, java.util.List<java.lang.String>>,java.lang.String,java.util.List<xyz.tesser.sdk.java.error.TesserErrorDetail>,java.lang.Throwable)
+}
+
+public static final class xyz.tesser.sdk.java.error.TesserError$ConfigError {
+    extends xyz.tesser.sdk.java.error.TesserError
+    public xyz.tesser.sdk.java.error.TesserError$ConfigError(java.lang.String)
+    public xyz.tesser.sdk.java.error.TesserError$ConfigError(java.lang.String,java.lang.Throwable)
+}
+
+public static final class xyz.tesser.sdk.java.error.TesserError$ConnectionError {
+    extends xyz.tesser.sdk.java.error.TesserError
+    public xyz.tesser.sdk.java.error.TesserError$ConnectionError(java.lang.String)
+    public xyz.tesser.sdk.java.error.TesserError$ConnectionError(java.lang.String,java.lang.Throwable)
+}
+
+public static final class xyz.tesser.sdk.java.error.TesserError$SigningError {
+    extends xyz.tesser.sdk.java.error.TesserError
+    public xyz.tesser.sdk.java.error.TesserError$SigningError(java.lang.String)
+    public xyz.tesser.sdk.java.error.TesserError$SigningError(java.lang.String,java.lang.Throwable)
+}
+
+public static final class xyz.tesser.sdk.java.error.TesserError$TimeoutError {
+    extends xyz.tesser.sdk.java.error.TesserError
+    public xyz.tesser.sdk.java.error.TesserError$TimeoutError(java.lang.String)
+    public xyz.tesser.sdk.java.error.TesserError$TimeoutError(java.lang.String,java.lang.Throwable)
+}
+
+public final record xyz.tesser.sdk.java.error.TesserErrorDetail {
+    extends java.lang.Record
+    public final boolean xyz.tesser.sdk.java.error.TesserErrorDetail.equals(java.lang.Object)
+    public final int xyz.tesser.sdk.java.error.TesserErrorDetail.hashCode()
+    public final java.lang.String xyz.tesser.sdk.java.error.TesserErrorDetail.toString()
+    public java.lang.String xyz.tesser.sdk.java.error.TesserErrorDetail.errorCode()
+    public java.lang.String xyz.tesser.sdk.java.error.TesserErrorDetail.errorMessage()
+    public java.lang.String xyz.tesser.sdk.java.error.TesserErrorDetail.uiMessage()
+    public xyz.tesser.sdk.java.error.TesserErrorDetail(java.lang.String,java.lang.String)
+    public xyz.tesser.sdk.java.error.TesserErrorDetail(java.lang.String,java.lang.String,java.lang.String)
+}
+

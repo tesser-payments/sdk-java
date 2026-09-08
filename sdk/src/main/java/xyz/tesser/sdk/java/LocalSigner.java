@@ -11,23 +11,20 @@ import xyz.tesser.sdk.java.internal.util.Logging;
 /**
  * Produces locally-signed activity payloads for Tesser API operations.
  *
- * <p>Construction validates that all three {@link SigningConfig} fields are
- * non-blank.
+ * <p>Construction validates that all three {@link SigningConfig} fields are non-blank.
  *
- * <p><b>Thread-safe and reentrant.</b> Holds no mutable state; a single instance
- * may be shared freely.
+ * <p><b>Thread-safe and reentrant.</b> Holds no mutable state; a single instance may be shared
+ * freely.
  *
- * <p>Every signing method returns a {@link CompletableFuture} and never throws an
- * <i>exception</i> synchronously — failures arrive as a failed future. {@link Error}
- * still propagates from the call site, since catching it to wrap in a future
- * would do more harm than good. Today the work runs on the calling thread; the
- * future type exists so that adding external I/O (an MPC co-signer call in the
- * stamper) stays a non-breaking change.
+ * <p>Every signing method returns a {@link CompletableFuture} and never throws an <i>exception</i>
+ * synchronously — failures arrive as a failed future. {@link Error} still propagates from the call
+ * site, since catching it to wrap in a future would do more harm than good. Today the work runs on
+ * the calling thread; the future type exists so that adding external I/O (an MPC co-signer call in
+ * the stamper) stays a non-breaking change.
  *
- * <p>On failure, {@code get()} throws {@link java.util.concurrent.ExecutionException}
- * and {@code join()} throws {@link java.util.concurrent.CompletionException}; in
- * both cases the {@link xyz.tesser.sdk.java.error.TesserError} is
- * {@code getCause()}.
+ * <p>On failure, {@code get()} throws {@link java.util.concurrent.ExecutionException} and {@code
+ * join()} throws {@link java.util.concurrent.CompletionException}; in both cases the {@link
+ * xyz.tesser.sdk.java.error.TesserError} is {@code getCause()}.
  */
 public final class LocalSigner {
 
@@ -66,14 +63,12 @@ public final class LocalSigner {
     /**
      * Builds and stamps an {@code ACTIVITY_TYPE_CREATE_WALLET} payload locally.
      *
-     * <p>The returned {@link SignedResult#signature()} is the exact value to pass
-     * into Tesser's wallet-creation request body. No HTTP is performed.
+     * <p>The returned {@link SignedResult#signature()} is the exact value to pass into Tesser's
+     * wallet-creation request body. No HTTP is performed.
      *
-     * <p>The future fails with
-     * {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} if the wallet type
-     * has no registered account spec, or
-     * {@link xyz.tesser.sdk.java.error.TesserError.SigningError} if the stamper
-     * fails.
+     * <p>The future fails with {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} if the
+     * wallet type has no registered account spec, or {@link
+     * xyz.tesser.sdk.java.error.TesserError.SigningError} if the stamper fails.
      */
     public CompletableFuture<SignedResult> signCreateWallet(CreateWalletParams params) {
         return CreateWalletActivity.sign(signing, params, stamp, clock);
@@ -85,21 +80,17 @@ public final class LocalSigner {
     }
 
     /**
-     * Builds and stamps an {@code ACTIVITY_TYPE_SIGN_TRANSACTION_V2} payload for a
-     * rebalance step.
+     * Builds and stamps an {@code ACTIVITY_TYPE_SIGN_TRANSACTION_V2} payload for a rebalance step.
      *
-     * <p>Submit {@link SignedStepResult#signature()} as
-     * {@code {"signature": ...}} to
-     * {@code POST /v1/treasury/rebalances/{transferId}/steps/{stepId}/sign}. No
-     * HTTP is performed here; Tesser forwards the activity to Turnkey.
+     * <p>Submit {@link SignedStepResult#signature()} as {@code {"signature": ...}} to {@code POST
+     * /v1/treasury/rebalances/{transferId}/steps/{stepId}/sign}. No HTTP is performed here; Tesser
+     * forwards the activity to Turnkey.
      *
-     * <p>The future fails with
-     * {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} for an unsupported
-     * network, or {@link xyz.tesser.sdk.java.error.TesserError.SigningError} if
-     * the stamper fails.
+     * <p>The future fails with {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} for an
+     * unsupported network, or {@link xyz.tesser.sdk.java.error.TesserError.SigningError} if the
+     * stamper fails.
      */
-    public CompletableFuture<SignedStepResult> signStep(
-            StepForSigning step, SignStepOptions opts) {
+    public CompletableFuture<SignedStepResult> signStep(StepForSigning step, SignStepOptions opts) {
         return SignStepActivity.sign(signing, step, opts, stamp, clock);
     }
 

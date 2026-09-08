@@ -15,8 +15,8 @@ import xyz.tesser.sdk.java.error.TesserError;
 import xyz.tesser.sdk.java.internal.util.Json;
 
 /**
- * Builds an {@code ACTIVITY_TYPE_CREATE_WALLET} payload, stamps it, and returns
- * the composite {@code base64({body, stamp})} signature Tesser's API consumes.
+ * Builds an {@code ACTIVITY_TYPE_CREATE_WALLET} payload, stamps it, and returns the composite
+ * {@code base64({body, stamp})} signature Tesser's API consumes.
  *
  * <p>Internal. Public callers go through {@link xyz.tesser.sdk.java.LocalSigner}.
  */
@@ -26,8 +26,8 @@ public final class CreateWalletActivity {
 
     /**
      * @param stamp injected for testability; production passes {@link Stamp#create()}
-     * @param clock injected for deterministic bodies in tests; production passes
-     *     {@code System::currentTimeMillis}
+     * @param clock injected for deterministic bodies in tests; production passes {@code
+     *     System::currentTimeMillis}
      */
     public static CompletableFuture<SignedResult> sign(
             SigningConfig signing, CreateWalletParams params, Stamp stamp, LongSupplier clock) {

@@ -3,9 +3,8 @@ package xyz.tesser.sdk.java;
 import xyz.tesser.sdk.java.error.TesserError;
 
 /**
- * Wallet types Tesser supports. Each maps to a specific account spec (curve,
- * pathFormat, path, addressFormat) used when building the
- * {@code ACTIVITY_TYPE_CREATE_WALLET} payload.
+ * Wallet types Tesser supports. Each maps to a specific account spec (curve, pathFormat, path,
+ * addressFormat) used when building the {@code ACTIVITY_TYPE_CREATE_WALLET} payload.
  */
 public enum WalletType {
     STABLECOIN_ETHEREUM("stablecoin_ethereum"),

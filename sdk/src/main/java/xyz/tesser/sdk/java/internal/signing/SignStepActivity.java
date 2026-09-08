@@ -13,11 +13,10 @@ import xyz.tesser.sdk.java.StepForSigning;
 import xyz.tesser.sdk.java.internal.util.Json;
 
 /**
- * Builds an {@code ACTIVITY_TYPE_SIGN_TRANSACTION_V2} Turnkey activity for a
- * rebalance step, stamps it, and returns the composite
- * {@code base64({body, stamp})} envelope consumed by
- * {@code /v1/treasury/rebalances/{transferId}/steps/{stepId}/sign}. Tesser
- * forwards the activity to Turnkey on the caller's behalf.
+ * Builds an {@code ACTIVITY_TYPE_SIGN_TRANSACTION_V2} Turnkey activity for a rebalance step, stamps
+ * it, and returns the composite {@code base64({body, stamp})} envelope consumed by {@code
+ * /v1/treasury/rebalances/{transferId}/steps/{stepId}/sign}. Tesser forwards the activity to
+ * Turnkey on the caller's behalf.
  *
  * <p>Internal. Public callers go through {@link xyz.tesser.sdk.java.LocalSigner}.
  */
@@ -26,8 +25,8 @@ public final class SignStepActivity {
     private SignStepActivity() {}
 
     /**
-     * @param opts reserved for future per-call tuning; currently unused, but kept
-     *     in the signature so callers stay source-compatible when options land
+     * @param opts reserved for future per-call tuning; currently unused, but kept in the signature
+     *     so callers stay source-compatible when options land
      * @param clock injected for deterministic bodies in tests
      */
     public static CompletableFuture<SignedStepResult> sign(

@@ -5,13 +5,12 @@ import java.util.stream.Collectors;
 import xyz.tesser.sdk.java.error.TesserError;
 
 /**
- * Maps a Tesser network identifier ({@code step.from_network} /
- * {@code step.to_network}) to the Turnkey {@code TRANSACTION_TYPE_*} used in
- * {@code parameters.type} of an {@code ACTIVITY_TYPE_SIGN_TRANSACTION_V2}
- * activity.
+ * Maps a Tesser network identifier ({@code step.from_network} / {@code step.to_network}) to the
+ * Turnkey {@code TRANSACTION_TYPE_*} used in {@code parameters.type} of an {@code
+ * ACTIVITY_TYPE_SIGN_TRANSACTION_V2} activity.
  *
- * <p>EVM-family networks all map to {@code TRANSACTION_TYPE_ETHEREUM} because
- * Turnkey keys the type by signing scheme, not by chain ID.
+ * <p>EVM-family networks all map to {@code TRANSACTION_TYPE_ETHEREUM} because Turnkey keys the type
+ * by signing scheme, not by chain ID.
  */
 public final class NetworkType {
 

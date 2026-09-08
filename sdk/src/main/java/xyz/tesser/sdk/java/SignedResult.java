@@ -5,8 +5,8 @@ import java.util.Objects;
 /**
  * Output of {@link LocalSigner#signCreateWallet}.
  *
- * @param signature base64-encoded JSON {@code {body, stamp}}. Pass straight into
- *     Tesser's wallet-creation request body as the {@code signature} field.
+ * @param signature base64-encoded JSON {@code {body, stamp}}. Pass straight into Tesser's
+ *     wallet-creation request body as the {@code signature} field.
  * @param metadata diagnostic context; not required for the request itself
  */
 public record SignedResult(String signature, SignedResultMetadata metadata) {

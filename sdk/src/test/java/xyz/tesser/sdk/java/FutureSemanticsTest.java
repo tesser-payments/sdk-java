@@ -9,8 +9,8 @@ import org.junit.jupiter.api.Test;
 import xyz.tesser.sdk.java.error.TesserError;
 
 /**
- * Pins the two rules that make a CompletableFuture-returning API safe, so they
- * cannot regress when real I/O is added to the stamper.
+ * Pins the two rules that make a CompletableFuture-returning API safe, so they cannot regress when
+ * real I/O is added to the stamper.
  */
 class FutureSemanticsTest {
 
@@ -38,7 +38,8 @@ class FutureSemanticsTest {
                 new LocalSigner(new SigningConfig("02".repeat(33), "not-hex-zzz", "org"));
 
         CompletableFuture<SignedResult> future =
-                signer.signCreateWallet(new CreateWalletParams("w", WalletType.STABLECOIN_ETHEREUM));
+                signer.signCreateWallet(
+                        new CreateWalletParams("w", WalletType.STABLECOIN_ETHEREUM));
 
         assertThat(future).isCompletedExceptionally();
         assertThat(future)
@@ -55,7 +56,8 @@ class FutureSemanticsTest {
         Thread callingThread = Thread.currentThread();
 
         CompletableFuture<SignedResult> future =
-                signer.signCreateWallet(new CreateWalletParams("w", WalletType.STABLECOIN_ETHEREUM));
+                signer.signCreateWallet(
+                        new CreateWalletParams("w", WalletType.STABLECOIN_ETHEREUM));
 
         assertThat(future).isDone();
         assertThat(future.get().signature()).isNotBlank();
@@ -66,9 +68,11 @@ class FutureSemanticsTest {
     void signerIsReentrantAndSafeToShare() throws Exception {
         LocalSigner signer = new LocalSigner(CFG);
         CompletableFuture<SignedResult> a =
-                signer.signCreateWallet(new CreateWalletParams("a", WalletType.STABLECOIN_ETHEREUM));
+                signer.signCreateWallet(
+                        new CreateWalletParams("a", WalletType.STABLECOIN_ETHEREUM));
         CompletableFuture<SignedResult> b =
-                signer.signCreateWallet(new CreateWalletParams("b", WalletType.STABLECOIN_ETHEREUM));
+                signer.signCreateWallet(
+                        new CreateWalletParams("b", WalletType.STABLECOIN_ETHEREUM));
         assertThat(a.get().signature()).isNotEqualTo(b.get().signature());
     }
 }
