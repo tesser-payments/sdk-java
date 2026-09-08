@@ -1,0 +1,31 @@
+[versions]
+jackson = "2.18.2"
+slf4j = "2.0.16"
+bouncycastle = "1.82"
+junit = "5.11.3"
+junit-platform = "1.11.3"
+assertj = "3.26.3"
+mockito = "5.14.2"
+spotless = "6.25.0"
+maven-publish = "0.30.0"
+binary-compat = "0.16.3"
+# Only the fixtures module needs Kotlin; it is never published.
+kotlin = "2.1.21"
+
+[libraries]
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "slf4j" }
+bouncycastle = { module = "org.bouncycastle:bcprov-jdk15to18", version.ref = "bouncycastle" }
+
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junit-platform" }
+assertj = { module = "org.assertj:assertj-core", version.ref = "assertj" }
+mockito-core = { module = "org.mockito:mockito-core", version.ref = "mockito" }
+mockito-junit = { module = "org.mockito:mockito-junit-jupiter", version.ref = "mockito" }
+
+[plugins]
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
+maven-publish = { id = "com.vanniktech.maven.publish", version.ref = "maven-publish" }
+binary-compatibility-validator = { id = "org.jetbrains.kotlinx.binary-compatibility-validator", version.ref = "binary-compat" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
