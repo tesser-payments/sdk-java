@@ -1,0 +1,165 @@
+name: Release
+
+# Manual only. There is deliberately no `push` trigger: publishing to Maven
+# Central cannot be undone (a version can be neither deleted nor overwritten),
+# so it is an explicit act, never a side effect of merging.
+#
+# To cut a release:
+#   Actions -> Release -> Run workflow, on `main`, with dry_run UNCHECKED and
+#   confirm_version set to the version in gradle.properties.
+#
+# Leaving dry_run checked (the default) publishes to Maven Local instead and
+# lists the signed artifacts, exercising this same job end to end without
+# touching Sonatype. Run that first.
+#
+# Note: a workflow_dispatch trigger only appears in the Actions UI once the
+# workflow file exists on the DEFAULT branch. Until this merges to main, the
+# "Run workflow" button will not be there.
+#
+# Every reference below is `inputs.dry_run`, never `github.event.inputs.dry_run`.
+# For a typed boolean input the former is a real boolean, so `== false` behaves;
+# the latter is the STRING "false", which is truthy and would make
+# `if: ${{ github.event.inputs.dry_run == false }}` never fire — silently turning
+# every dry run into a real publish. Do not "simplify" these expressions.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: publish to Maven Local only. Uncheck to publish to Maven Central."
+        type: boolean
+        default: true
+      confirm_version:
+        description: "For a real release, type the version from gradle.properties (e.g. 0.0.1). Ignored for dry runs."
+        type: string
+        required: false
+
+# `contents: write` is needed so the publish job can push the version tag.
+permissions:
+  contents: write
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0 # full history so `git rev-parse` can see existing tags
+      - id: read
+        name: Read project version from gradle.properties
+        run: |
+          VERSION=$(grep '^version=' gradle.properties | cut -d= -f2)
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not read 'version=' from gradle.properties" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Project version: $VERSION"
+
+      - name: Validate a real release
+        # Every check that makes publishing deliberate lives here, before any
+        # build work, so a mistake costs seconds rather than a wasted run.
+        # Dry runs skip all of it: they are meant to be cheap and frequent.
+        if: ${{ inputs.dry_run == false }}
+        run: |
+          VERSION="${{ steps.read.outputs.version }}"
+
+          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
+            echo "::error::Real releases must run from main, not ${{ github.ref }}." >&2
+            exit 1
+          fi
+
+          if [ "${{ inputs.confirm_version }}" != "$VERSION" ]; then
+            echo "::error::confirm_version ('${{ inputs.confirm_version }}') does not match gradle.properties ('$VERSION'). Refusing to publish." >&2
+            exit 1
+          fi
+
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists -- $VERSION is already released. Bump 'version=' in gradle.properties first." >&2
+            exit 1
+          fi
+
+          echo "Releasing $VERSION from main. No existing v$VERSION tag."
+
+  publish:
+    needs: gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+
+      - name: Verify build
+        # Mirrors ci.yml exactly. :sdk and the examples are named explicitly
+        # because a root `build` would also build :fixtures, which resolves
+        # xyz.tesser:sdk:0.0.4 from mavenLocal and cannot build on a clean
+        # runner. :sdk:build runs the full test suite; spotlessCheck and
+        # apiCheck are wired into `check`, so `build` covers them. The examples
+        # are included because sdk-kotlin's root `build` compiles its examples,
+        # and scoping to :sdk alone would quietly drop that coverage from the
+        # release gate -- on the least-verified part of the deliverable.
+        run: |
+          ./gradlew :sdk:build \
+            :examples:create-wallet:build \
+            :examples:sign-rebalance-step-webhooks:build \
+            :examples:sign-rebalance-step-polling:build \
+            --no-daemon --stacktrace
+
+      - name: Publish (Sonatype Central Portal, or Maven Local for dry runs)
+        env:
+          # Vanniktech-recognized env-var names. Configure these in
+          # GitHub > Settings > Secrets and variables > Actions:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.SONATYPE_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+          # Base64-encoded ASCII-armored secret key. Stored as base64 so the
+          # multi-line PEM block survives the GitHub Actions secret pipeline
+          # without CRLF / trailing-whitespace mangling that breaks BC's PGP
+          # parser ("Could not read PGP secret key"). Generate with:
+          #   gpg --export-secret-keys --armor <key-id> | base64 | pbcopy
+          # then paste into the `GPG_PRIVATE_KEY_B64` repo secret.
+          GPG_PRIVATE_KEY_B64: ${{ secrets.GPG_PRIVATE_KEY_B64 }}
+          # Set by the dispatch input; defaults to true, so the default action
+          # of running this workflow cannot publish. The gate job has already
+          # verified branch, version confirmation, and tag absence when false.
+          DRY_RUN: ${{ inputs.dry_run }}
+        # `--no-configuration-cache` is required: Vanniktech's
+        # SonatypeRepositoryBuildService injects `BuildFeatures` at execution
+        # time, which Gradle's configuration cache refuses to serialize
+        # (UnknownServiceException). The rest of the build keeps the cache on
+        # via gradle.properties — only the publish step opts out.
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY_B64" ]; then
+            echo "::error::GPG_PRIVATE_KEY_B64 secret is empty or unset" >&2
+            exit 1
+          fi
+          ORG_GRADLE_PROJECT_signingInMemoryKey="$(printf '%s' "$GPG_PRIVATE_KEY_B64" | base64 --decode)"
+          export ORG_GRADLE_PROJECT_signingInMemoryKey
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "Dry run: publishing to Maven Local (~/.m2/repository)."
+            ./gradlew :sdk:publishToMavenLocal --no-daemon --no-configuration-cache --stacktrace
+            echo "Signed artifacts that would be uploaded:"
+            find ~/.m2/repository/xyz/tesser/sdk-java -type f | sort
+          else
+            ./gradlew :sdk:publishAndReleaseToMavenCentral --no-daemon --no-configuration-cache --stacktrace
+          fi
+
+      - name: Tag the release and create a GitHub release
+        # Real releases only. A dry run must leave no trace in the repo.
+        if: ${{ inputs.dry_run == false }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          TAG="v${{ needs.gate.outputs.version }}"
+          git tag "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" --generate-notes
