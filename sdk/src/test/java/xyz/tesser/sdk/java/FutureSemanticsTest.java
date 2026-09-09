@@ -1,12 +1,17 @@
 package xyz.tesser.sdk.java;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import xyz.tesser.sdk.java.error.TesserError;
+import xyz.tesser.sdk.java.internal.signing.Stamp;
 
 /**
  * Pins the two rules that make a CompletableFuture-returning API safe, so they cannot regress when
@@ -14,8 +19,7 @@ import xyz.tesser.sdk.java.error.TesserError;
  */
 class FutureSemanticsTest {
 
-    private static final SigningConfig CFG =
-            new SigningConfig("02".repeat(33), "01".repeat(32), "org_futures");
+    private static final SigningConfig CFG = TestKeys.config("org_futures");
 
     @Test
     void unsupportedNetworkFailsTheFutureRatherThanThrowingSynchronously() {
@@ -33,9 +37,16 @@ class FutureSemanticsTest {
     }
 
     @Test
-    void malformedPrivateKeyFailsTheFutureRatherThanThrowingSynchronously() {
-        LocalSigner signer =
-                new LocalSigner(new SigningConfig("02".repeat(33), "not-hex-zzz", "org"));
+    void stamperFailureFailsTheFutureRatherThanThrowingSynchronously() {
+        // A malformed private key can no longer reach this path — LocalSigner's
+        // constructor rejects it — so the stamper failure is injected directly.
+        // This is the case that matters once the stamper does real I/O.
+        Stamp exploding = mock(Stamp.class);
+        when(exploding.stamp(any(), any()))
+                .thenReturn(
+                        CompletableFuture.failedFuture(
+                                new TesserError.SigningError("co-signer unreachable")));
+        LocalSigner signer = new LocalSigner(CFG, exploding);
 
         CompletableFuture<SignedResult> future =
                 signer.signCreateWallet(
@@ -46,6 +57,16 @@ class FutureSemanticsTest {
                 .failsWithin(Duration.ZERO)
                 .withThrowableOfType(ExecutionException.class)
                 .withCauseInstanceOf(TesserError.SigningError.class);
+    }
+
+    @Test
+    void aMalformedPrivateKeyIsRejectedAtConstructionInstead() {
+        assertThatThrownBy(
+                        () ->
+                                new LocalSigner(
+                                        new SigningConfig(
+                                                TestKeys.PUBLIC_KEY, "not-hex-zzz", "org")))
+                .isInstanceOf(TesserError.ConfigError.class);
     }
 
     @Test

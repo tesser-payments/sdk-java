@@ -4,6 +4,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import xyz.tesser.sdk.java.internal.signing.CreateWalletActivity;
+import xyz.tesser.sdk.java.internal.signing.KeyPairCheck;
 import xyz.tesser.sdk.java.internal.signing.SignStepActivity;
 import xyz.tesser.sdk.java.internal.signing.Stamp;
 import xyz.tesser.sdk.java.internal.util.Logging;
@@ -11,7 +12,11 @@ import xyz.tesser.sdk.java.internal.util.Logging;
 /**
  * Produces locally-signed activity payloads for Tesser API operations.
  *
- * <p>Construction validates that all three {@link SigningConfig} fields are non-blank.
+ * <p>Construction validates that all three {@link SigningConfig} fields are non-blank, that the
+ * private key is a well-formed P-256 scalar, and that the public key is that scalar's public point
+ * — a mismatched pair throws {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} here rather
+ * than becoming an opaque authentication rejection later. This is the only cryptographic work the
+ * constructor does; it costs one scalar multiplication, once per signer.
  *
  * <p><b>Thread-safe and reentrant.</b> Holds no mutable state; a single instance may be shared
  * freely.
@@ -49,6 +54,7 @@ public final class LocalSigner {
         requireNonBlank(signing.publicKey(), "SigningConfig.publicKey must not be blank");
         requireNonBlank(signing.privateKey(), "SigningConfig.privateKey must not be blank");
         requireNonBlank(signing.enclaveId(), "SigningConfig.enclaveId must not be blank");
+        KeyPairCheck.verify(signing);
         this.signing = signing;
         this.stamp = stamp;
         this.clock = clock;

@@ -16,8 +16,7 @@ import xyz.tesser.sdk.java.internal.util.Json;
 
 class LocalSignerStepTest {
 
-    private static final SigningConfig CFG =
-            new SigningConfig("02".repeat(33), "01".repeat(32), "org_local_signer_step_test");
+    private static final SigningConfig CFG = TestKeys.config("org_local_signer_step_test");
 
     private static final StepForSigning STEP =
             new StepForSigning(

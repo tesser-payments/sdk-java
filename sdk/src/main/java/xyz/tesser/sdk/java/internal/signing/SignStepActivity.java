@@ -3,6 +3,7 @@ package xyz.tesser.sdk.java.internal.signing;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import xyz.tesser.sdk.java.SignStepOptions;
@@ -25,8 +26,8 @@ public final class SignStepActivity {
     private SignStepActivity() {}
 
     /**
-     * @param opts reserved for future per-call tuning; currently unused, but kept in the signature
-     *     so callers stay source-compatible when options land
+     * @param opts reserved for future per-call tuning; no field is read yet, but it is still
+     *     null-checked so a null cannot sit undetected in caller code until the first option lands
      * @param clock injected for deterministic bodies in tests
      */
     public static CompletableFuture<SignedStepResult> sign(
@@ -36,6 +37,9 @@ public final class SignStepActivity {
             Stamp stamp,
             LongSupplier clock) {
         try {
+            // Inside the try, so it fails the future rather than throwing at the
+            // call site — the contract LocalSigner documents and FutureSemanticsTest pins.
+            Objects.requireNonNull(opts, "SignStepOptions must not be null");
             String turnkeyType = NetworkType.toTurnkeyType(step.network());
 
             ObjectNode body = Json.newObject();

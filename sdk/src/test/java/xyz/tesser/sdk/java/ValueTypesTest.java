@@ -62,6 +62,18 @@ class ValueTypesTest {
     }
 
     @Test
+    void signingConfigToStringMasksThePrivateKeyButKeepsStructuralEquality() {
+        SigningConfig cfg = new SigningConfig("02abab", "deadbeefdeadbeef", "org_1");
+        assertThat(cfg.toString()).doesNotContain("deadbeef").contains("privateKey=***");
+        // The non-secret fields stay visible so the rendering is still useful for
+        // diagnosing a misconfigured enclave or an uncompressed public key.
+        assertThat(cfg.toString()).contains("publicKey=02abab").contains("enclaveId=org_1");
+        assertThat(cfg)
+                .isEqualTo(new SigningConfig("02abab", "deadbeefdeadbeef", "org_1"))
+                .isNotEqualTo(new SigningConfig("02abab", "0badc0de0badc0de", "org_1"));
+    }
+
+    @Test
     void signedResultExposesSignatureAndMetadata() {
         SignedResultMetadata meta = new SignedResultMetadata("X-Stamp", "v", "{}");
         SignedResult result = new SignedResult("SIG", meta);

@@ -12,8 +12,6 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Objects;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import xyz.tesser.sdk.java.LocalSigner;
 import xyz.tesser.sdk.java.SignedStepResult;
 import xyz.tesser.sdk.java.SigningConfig;
@@ -50,9 +48,6 @@ import xyz.tesser.sdk.java.StepForSigning;
 public final class Main {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-
-    private static final Pattern ACCESS_TOKEN =
-            Pattern.compile("\"access_token\"\\s*:\\s*\"([^\"]+)\"");
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
 
@@ -247,12 +242,22 @@ public final class Main {
         Duration timeout = Duration.ofMinutes(2);
         long deadlineNanos = System.nanoTime() + timeout.toNanos();
         String lastReportedStatus = null;
+        boolean reportedNoStepsYet = false;
 
         while (true) {
             JsonNode rebalance = getRebalanceData(baseUrl, token, rebalanceId);
             JsonNode steps = rebalance.path("steps");
             if (!steps.isArray() || steps.isEmpty()) {
-                throw new IllegalStateException("Rebalance has no steps yet: " + rebalance);
+                // A freshly-created rebalance can return an empty `steps` array
+                // for the first poll or two while planning finishes. That is the
+                // exact race a polling loop exists to absorb, so wait rather than
+                // treating it as terminal; the deadline below still bounds it.
+                if (!reportedNoStepsYet) {
+                    System.out.println("  no steps yet; waiting for the rebalance to be planned");
+                    reportedNoStepsYet = true;
+                }
+                sleepUntilNextPoll(deadlineNanos, timeout, "the rebalance to produce a step");
+                continue;
             }
             JsonNode step = steps.get(0);
             String status = step.path("status").asText(null);
@@ -438,12 +443,15 @@ public final class Main {
             throw new IllegalStateException(
                     "OAuth token exchange failed: " + resp.statusCode() + " " + resp.body());
         }
-        Matcher m = ACCESS_TOKEN.matcher(resp.body());
-        if (!m.find()) {
+        // Parsed, not regexed: a regex over the raw body mis-handles any escape
+        // sequence inside the token and can match the literal text "access_token"
+        // somewhere else in the response.
+        JsonNode token = JSON.readTree(resp.body()).path("access_token");
+        if (!token.isTextual() || token.asText().isBlank()) {
             throw new IllegalStateException(
                     "OAuth response did not contain access_token: " + resp.body());
         }
-        return m.group(1);
+        return token.asText();
     }
 
     private static String getJson(String url, String bearer) throws Exception {

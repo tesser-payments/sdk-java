@@ -12,10 +12,10 @@ import org.bouncycastle.crypto.digests.SHA256Digest;
 import org.bouncycastle.crypto.params.ECDomainParameters;
 import org.bouncycastle.crypto.params.ECPrivateKeyParameters;
 import org.bouncycastle.crypto.signers.ECDSASigner;
-import org.bouncycastle.jce.ECNamedCurveTable;
-import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;
+import org.bouncycastle.crypto.signers.HMacDSAKCalculator;
 import xyz.tesser.sdk.java.SigningConfig;
 import xyz.tesser.sdk.java.error.TesserError;
+import xyz.tesser.sdk.java.internal.util.Hex;
 import xyz.tesser.sdk.java.internal.util.Json;
 
 /**
@@ -33,6 +33,11 @@ import xyz.tesser.sdk.java.internal.util.Json;
  *
  * <p>Returned under the header name {@code X-Stamp}. Key loading, ECDSA signing and DER encoding
  * all use Bouncy Castle; only the JSON envelope and base64url wrap are written here.
+ *
+ * <p>Nonces are RFC 6979 deterministic, so stamping the same body with the same key twice yields
+ * the same signature. That is a Java-SDK-only property — the Kotlin SDK and the vendor's WebCrypto
+ * implementation use random k — and it is invisible on the wire: a verifier checks {@code (r, s)}
+ * against the public key and cannot tell how k was derived.
  */
 final class ApiKeyStamp implements Stamp {
 
@@ -43,7 +48,7 @@ final class ApiKeyStamp implements Stamp {
 
             ObjectNode stampJson = Json.newObject();
             stampJson.put("publicKey", keys.publicKey());
-            stampJson.put("signature", bytesToHex(sigDer));
+            stampJson.put("signature", Hex.encode(sigDer));
             stampJson.put("scheme", "SIGNATURE_SCHEME_TK_API_P256");
 
             String encoded =
@@ -60,15 +65,8 @@ final class ApiKeyStamp implements Stamp {
 
     private static byte[] signDer(String privateKeyHex, String body) {
         try {
-            byte[] privBytes = hexToBytes(privateKeyHex);
-            BigInteger scalar = new BigInteger(1, privBytes);
-            ECNamedCurveParameterSpec spec = ECNamedCurveTable.getParameterSpec("secp256r1");
-            if (scalar.compareTo(BigInteger.ONE) < 0 || scalar.compareTo(spec.getN()) >= 0) {
-                throw new IllegalArgumentException(
-                        "Private key scalar is out of the valid range [1, n-1]");
-            }
-            ECDomainParameters domain =
-                    new ECDomainParameters(spec.getCurve(), spec.getG(), spec.getN(), spec.getH());
+            BigInteger scalar = P256.scalar(privateKeyHex);
+            ECDomainParameters domain = P256.domain();
 
             byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
             byte[] hash = new byte[32];
@@ -76,7 +74,13 @@ final class ApiKeyStamp implements Stamp {
             digest.update(bodyBytes, 0, bodyBytes.length);
             digest.doFinal(hash, 0);
 
-            ECDSASigner signer = new ECDSASigner();
+            // RFC 6979 deterministic k rather than Bouncy Castle's default
+            // RandomDSAKCalculator. Both are interoperable with the vendor SDK
+            // (a verifier cannot tell how k was chosen), but a weak or misseeded
+            // SecureRandom under random-k leaks the private scalar outright,
+            // while deterministic k derives it from the key and the message
+            // digest and so has no RNG dependency at all.
+            ECDSASigner signer = new ECDSASigner(new HMacDSAKCalculator(new SHA256Digest()));
             signer.init(true, new ECPrivateKeyParameters(scalar, domain));
             BigInteger[] rs = signer.generateSignature(hash);
 
@@ -86,47 +90,5 @@ final class ApiKeyStamp implements Stamp {
         } catch (IOException | RuntimeException e) {
             throw new TesserError.SigningError("Signing failed: " + e.getMessage(), e);
         }
-    }
-
-    private static byte[] hexToBytes(String hex) {
-        if (hex.length() % 2 != 0) {
-            throw new IllegalArgumentException("Hex string must have even length");
-        }
-        byte[] out = new byte[hex.length() / 2];
-        for (int i = 0; i < out.length; i++) {
-            out[i] = (byte) ((hexDigit(hex.charAt(i * 2)) << 4) | hexDigit(hex.charAt(i * 2 + 1)));
-        }
-        return out;
-    }
-
-    /**
-     * ASCII-only hex, deliberately not {@link Character#digit}.
-     *
-     * <p>{@code Character.digit} accepts Unicode digits and letters from other blocks: it returns 5
-     * for U+0665 (Arabic-Indic five) and 10 for U+FF21 (fullwidth A). The Kotlin SDK validates with
-     * {@code it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F'}, so it rejects those. Using
-     * Character.digit here would make the Java SDK silently accept a key the Kotlin SDK refuses and
-     * sign with a different scalar than the caller intended — precisely the wrong-signature failure
-     * this SDK is built to avoid.
-     */
-    private static int hexDigit(char c) {
-        if (c >= '0' && c <= '9') {
-            return c - '0';
-        }
-        if (c >= 'a' && c <= 'f') {
-            return c - 'a' + 10;
-        }
-        if (c >= 'A' && c <= 'F') {
-            return c - 'A' + 10;
-        }
-        throw new IllegalArgumentException("Hex string contains non-hex characters");
-    }
-
-    private static String bytesToHex(byte[] bytes) {
-        StringBuilder sb = new StringBuilder(bytes.length * 2);
-        for (byte b : bytes) {
-            sb.append(String.format("%02x", b));
-        }
-        return sb.toString();
     }
 }

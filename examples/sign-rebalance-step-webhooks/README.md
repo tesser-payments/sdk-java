@@ -6,9 +6,12 @@ End-to-end harness that exercises the full Tesser rebalance flow:
 2. Listen on a local webhook endpoint for `step.signature_requested` and the
    terminal `status=completed` step event.
 3. Create a rebalance via `POST /v1/treasury/rebalances`.
-4. Receive the signing event, sign the step locally with `LocalSigner.signStep`,
-   and POST the signature to `/v1/treasury/rebalances/{id}/steps/{stepId}/sign`.
-5. Wait for a step event with `data.object.status == "completed"` and report `completed_at`.
+4. Receive the signing event for *this run's* rebalance, re-read the step over an
+   authenticated `GET /v1/treasury/rebalances/{id}`, sign that with
+   `LocalSigner.signStep`, and POST the signature to
+   `/v1/treasury/rebalances/{id}/steps/{stepId}/sign`.
+5. Wait for a step event with `data.object.status == "completed"`, then confirm it
+   with a GET and report `completed_at`.
 
 > **Status:** this example is **compile-verified only**. It builds and fails
 > with the expected message when environment variables are absent, but the full
@@ -21,6 +24,27 @@ End-to-end harness that exercises the full Tesser rebalance flow:
 > Webhook signature verification is also still intentionally skipped pending
 > the staging probe that captures the verification algorithm; do not run this
 > against production until that lands.
+
+## What the example does and does not trust
+
+The listener is reachable by anyone who finds the tunnel URL, and signature
+verification is not implemented, so **every incoming POST is treated as
+untrusted**. The example uses webhook events only as a *trigger*:
+
+- The `step.signature_requested` event must carry the `rebalance_id` returned by
+  this run's `createRebalance`, so a forged or left-over event is skipped.
+- The bytes that get signed — `unsigned_transaction` — always come back from an
+  authenticated `GET`, never from the POST body. Signing the payload directly
+  would let an unauthenticated caller choose the transaction this program signs
+  with the enclave key and submits to the real API.
+- The final "complete" line is likewise re-read from the API rather than printed
+  off the event, and the read is retried until the API itself reports
+  `status=completed` — an unchecked single read would happily print a stale
+  status with `completed_at=null` and exit successfully.
+
+Request bodies are capped at 64 KiB (`413` beyond that) and the event queue holds
+256 events (`503` beyond that), so a POST flood against the tunnel cannot grow the
+heap without limit.
 
 ---
 
@@ -92,11 +116,11 @@ end-to-end.
 ## Notes on the port
 
 The Kotlin original drives this flow with coroutines. The Java version differs
-in exactly two places:
+in the following places:
 
 | Kotlin | Java |
 |---|---|
-| `Channel<JsonObject>(capacity = Channel.UNLIMITED)` | `LinkedBlockingQueue<JsonNode>` (unbounded by default) |
+| `Channel<JsonObject>(capacity = Channel.UNLIMITED)` | `LinkedBlockingQueue<JsonNode>` bounded to 256 — the Kotlin channel is fed by a private listener, this one by the public internet |
 | `withTimeout(t) { events.receive() }` | `queue.poll(remaining, NANOSECONDS)` against a deadline computed once, with an explicit null-on-timeout branch — `poll` reports a timeout by returning null rather than throwing |
 | `kotlinx.serialization` `JsonObject` | Jackson `JsonNode` |
 | `runBlocking { signer.signStep(step) }` | `signer.signStep(step).join()` |
@@ -115,8 +139,10 @@ Note that `join()` wraps failures in `CompletionException`; unwrap with
 | `OAuth token exchange failed: 401` | Bad `API_CLIENT_ID` / `API_CLIENT_SECRET` | Re-copy from the Tesser dashboard. |
 | `POST .../v1/treasury/rebalances failed: 422` | Bad `desired` block (missing fields, currency mismatch, etc.) | Inspect the API error message. Confirm `from` and `to` fields match Tesser's account/currency expectations. |
 | `Timed out after PT1M waiting for webhook event: type=step.signature_requested` | Webhook is not registered with Tesser, or the tunnel URL changed | Re-check the dashboard subscription URL. Re-run the tunnel and update the registration. Or switch to the polling example. |
-| Webhook arrives but is skipped | The event doesn't satisfy the predicate being awaited | The skip line prints the event `type` and `id`. The harness only acts on `step.signature_requested`, then on any step event with `status=completed`. |
-| `Missing required field \`unsigned_transaction\` in: ...` | The step DTO field names changed on the server side | File an issue with the captured event payload. The expected fields are `id`, `rebalance_id`, `unsigned_transaction`. |
+| Webhook arrives but is skipped | The event doesn't satisfy the predicate being awaited | The skip line prints the event `type` and `id`. The harness only acts on a `step.signature_requested` whose `rebalance_id` matches this run, then on a step event with `status=completed`. A `signature_requested` left over from an earlier run is skipped by design. |
+| `Missing required field \`unsigned_transaction\` in: ...` | The step DTO field names changed on the server side | File an issue with the captured `GET /v1/treasury/rebalances/{id}` response. The expected step fields are `id`, `transfer_id`, `unsigned_transaction`. |
+| `Timed out after PT30S waiting for step ... to carry an \`unsigned_transaction\`` | The webhook beat the read-your-writes window by more than 30s, or the step never got a transaction | Re-run. If it repeats, use the polling example and capture the rebalance GET responses. |
+| `Timed out after PT30S waiting for step ... to report \`status=completed\`` | The `completed` event arrived but the authenticated GET never agreed within 30s | The step is probably fine — the example refuses to print success it cannot confirm. Check the rebalance in the dashboard, or re-read it with `GET /v1/treasury/rebalances/{id}`. |
 | `POST .../sign failed: 422 ... bad signature` | Stamp wire format does not match what the server expects | Capture the unsigned transaction bytes and the produced signature; file an issue with both. The current implementation stamps the unsigned transaction hex string verbatim using the X-Stamp envelope. |
 | `POST .../sign failed: 409 ... step already signed / expired` | Either a previous run already submitted, or the rebalance timed out | Create a fresh rebalance and try again. |
 | `Address already in use` on startup | Something else holds `WEBHOOK_PORT` | Change `WEBHOOK_PORT`, or stop the other process. |

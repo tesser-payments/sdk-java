@@ -1,4 +1,5 @@
 import com.vanniktech.maven.publish.SonatypeHost
+import java.lang.module.ModuleDescriptor
 import java.lang.reflect.Modifier
 import java.net.URLClassLoader
 
@@ -38,11 +39,11 @@ tasks.test {
     useJUnitPlatform()
 }
 
-tasks.jar {
-    manifest {
-        attributes("Automatic-Module-Name" to "xyz.tesser.sdk.java")
-    }
-}
+// No Automatic-Module-Name: src/main/java/module-info.java declares a real
+// module of the same name, and an explicit descriptor makes the manifest
+// attribute dead weight -- the JVM ignores it once module-info.class is present.
+// Unlike the attribute, the descriptor actually stops consumers reaching
+// xyz.tesser.sdk.java.internal.*.
 
 // ---------------------------------------------------------------------------
 // Binary-compatibility gate
@@ -107,10 +108,15 @@ abstract class ApiSignatureTask : DefaultTask() {
                         }
                         .toList()
                 }
+                // module-info.class has ACC_MODULE set and is not loadable by
+                // Class.forName. It is still API -- dropping an `exports` breaks
+                // consumers -- so it is rendered from its descriptor below instead.
+                .filterNot { it == "module-info" }
                 .filterNot { name -> ignored.any { name == it || name.startsWith("$it.") } }
                 .sorted()
 
         val out = StringBuilder()
+        out.append(renderModuleDescriptor(roots))
         try {
             for (name in binaryNames) {
                 val cls = Class.forName(name, false, loader)
@@ -124,6 +130,52 @@ abstract class ApiSignatureTask : DefaultTask() {
             loader.close()
         }
         return out.toString()
+    }
+
+    /**
+     * Renders the JPMS descriptor, so an accidental change to `exports` or
+     * `requires` shows up as an API diff like any other. Empty when the project
+     * has no module-info.
+     *
+     * Qualified targets are rendered, not just the package name: narrowing
+     * `exports foo` to `exports foo to bar` breaks every consumer except `bar`,
+     * and without the `to` clause the two are indistinguishable in the lockfile.
+     * `targets()` is empty for an unqualified directive, so those render unchanged.
+     *
+     * `provides` is included because a consumer can bind to it through
+     * ServiceLoader. `uses` is not: it declares what this module consumes, which
+     * is an implementation detail rather than part of the contract offered out.
+     */
+    private fun renderModuleDescriptor(roots: List<File>): String {
+        val file = roots.map { File(it, "module-info.class") }.firstOrNull { it.isFile }
+            ?: return ""
+        val descriptor: ModuleDescriptor = file.inputStream().use { ModuleDescriptor.read(it) }
+
+        fun qualified(directive: String, source: String, targets: Set<String>) =
+            if (targets.isEmpty()) {
+                "$directive $source"
+            } else {
+                "$directive $source to ${targets.sorted().joinToString(", ")}"
+            }
+
+        val lines = mutableListOf<String>()
+        descriptor.requires().mapTo(lines) { req ->
+            val mods = req.modifiers().map { it.name.lowercase() }.sorted()
+            val prefix = if (mods.isEmpty()) "" else mods.joinToString(" ", postfix = " ")
+            "requires $prefix${req.name()}"
+        }
+        descriptor.exports().mapTo(lines) { qualified("exports", it.source(), it.targets()) }
+        descriptor.opens().mapTo(lines) { qualified("opens", it.source(), it.targets()) }
+        descriptor.provides().mapTo(lines) { prov ->
+            "provides ${prov.service()} with ${prov.providers().sorted().joinToString(", ")}"
+        }
+        lines.sort()
+
+        return buildString {
+            append("module ").append(descriptor.name()).append(" {\n")
+            lines.forEach { append("    ").append(it).append("\n") }
+            append("}\n\n")
+        }
     }
 
     private fun describe(cls: Class<*>): String {

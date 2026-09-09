@@ -21,6 +21,7 @@ import org.bouncycastle.math.ec.ECPoint;
 import org.junit.jupiter.api.Test;
 import xyz.tesser.sdk.java.SigningConfig;
 import xyz.tesser.sdk.java.error.TesserError;
+import xyz.tesser.sdk.java.internal.util.Hex;
 import xyz.tesser.sdk.java.internal.util.Json;
 
 class ApiKeyStampTest {
@@ -53,11 +54,11 @@ class ApiKeyStampTest {
         String sigHex = obj.get("signature").asText();
         assertThat(sigHex).matches("^[0-9a-f]+$");
         // P-256 DER ECDSA: SEQUENCE header (2) + two INTEGERs of 1-33 value bytes
-        // plus 2 header bytes each. ECDSA k is random, so r and s occasionally
-        // encode short. The Kotlin test uses 138 as the floor; 136 is reachable
-        // (both r and s 31 bytes, roughly 1 in 65,000 signatures) and the Java
-        // suite generates more signatures than the Kotlin one does. Widened so a
-        // genuine one-in-many-thousands run is not misread as a regression.
+        // plus 2 header bytes each. r and s can encode short when their leading
+        // bytes are zero, so this stays a range rather than an exact length even
+        // though k is now deterministic — the range is a property of DER, not of
+        // the nonce. The Kotlin test's floor of 138 is widened to 136 because both
+        // r and s encoding at 31 bytes is reachable.
         assertThat(sigHex.length()).isBetween(136, 144);
     }
 
@@ -130,12 +131,55 @@ class ApiKeyStampTest {
     }
 
     @Test
-    void stampIsDeterministicallyShapedAcrossRepeatedCalls() throws Exception {
-        // ECDSA k is random, so signatures differ; the envelope shape must not.
+    void stampIsByteIdenticalForTheSameKeyAndBody() throws Exception {
+        // RFC 6979 derives k from the key and the message digest, so repeating a
+        // stamp reproduces it exactly. Under the previous random-k calculator this
+        // assertion was inverted.
         StampResult a = new ApiKeyStamp().stamp(TEST_CFG, "{}").get();
         StampResult b = new ApiKeyStamp().stamp(TEST_CFG, "{}").get();
         assertThat(a.stampHeaderName()).isEqualTo(b.stampHeaderName());
+        assertThat(a.stampHeaderValue()).isEqualTo(b.stampHeaderValue());
+    }
+
+    @Test
+    void stampStillDiffersWhenTheBodyDiffers() throws Exception {
+        // Determinism must come from the input, not from a constant signature.
+        StampResult a = new ApiKeyStamp().stamp(TEST_CFG, "{\"a\":1}").get();
+        StampResult b = new ApiKeyStamp().stamp(TEST_CFG, "{\"a\":2}").get();
         assertThat(a.stampHeaderValue()).isNotEqualTo(b.stampHeaderValue());
+    }
+
+    @Test
+    void deterministicNonceMatchesTheRfc6979TestVectorForP256WithSha256() throws Exception {
+        // RFC 6979 A.2.5: key x = C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721,
+        // message "sample", SHA-256 => the r and s below. Signing that message
+        // through the stamper must reproduce them exactly; if Bouncy Castle's
+        // k calculator were ever swapped back to random, this fails immediately.
+        String x = "C9AFA9D845BA75166B5C215767B1D6934E50C3DB36E89B127B8A622B120F6721";
+        // The stamper does not check the pair (LocalSigner does), but deriving the
+        // public key keeps the fixture honest rather than carrying a copied constant.
+        String pub = Hex.encode(P256.publicPoint(new BigInteger(x, 16)).getEncoded(true));
+        SigningConfig cfg = new SigningConfig(pub, x, "org_rfc6979");
+        StampResult result = new ApiKeyStamp().stamp(cfg, "sample").get();
+        JsonNode obj =
+                Json.readTree(
+                        new String(
+                                Base64.getUrlDecoder().decode(result.stampHeaderValue()),
+                                StandardCharsets.UTF_8));
+        byte[] sigBytes = hexToBytes(obj.get("signature").asText());
+        try (ASN1InputStream in = new ASN1InputStream(sigBytes)) {
+            ASN1Sequence seq = (ASN1Sequence) in.readObject();
+            assertThat(((ASN1Integer) seq.getObjectAt(0)).getValue())
+                    .isEqualTo(
+                            new BigInteger(
+                                    "EFD48B2AACB6A8FD1140DD9CD45E81D69D2C877B56AAF991C34D0EA84EAF3716",
+                                    16));
+            assertThat(((ASN1Integer) seq.getObjectAt(1)).getValue())
+                    .isEqualTo(
+                            new BigInteger(
+                                    "F7CB1C942D657C41D436C7A1B6E29F65F3E900DBB9AFF4064DC4AB2F843ACDA8",
+                                    16));
+        }
     }
 
     private static byte[] hexToBytes(String hex) {
