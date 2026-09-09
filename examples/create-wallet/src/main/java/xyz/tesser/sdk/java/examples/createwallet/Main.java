@@ -1,13 +1,14 @@
 package xyz.tesser.sdk.java.examples.createwallet;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import xyz.tesser.sdk.java.CreateWalletParams;
 import xyz.tesser.sdk.java.LocalSigner;
 import xyz.tesser.sdk.java.SignedResult;
@@ -36,8 +37,7 @@ import xyz.tesser.sdk.java.WalletType;
  */
 public final class Main {
 
-    private static final Pattern ACCESS_TOKEN =
-            Pattern.compile("\"access_token\"\\s*:\\s*\"([^\"]+)\"");
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     private Main() {}
 
@@ -67,14 +67,16 @@ public final class Main {
                 signer.signCreateWallet(new CreateWalletParams(walletName, walletType)).join();
 
         System.out.printf("Submitting to %s/v1/accounts/wallets ...%n", baseUrl);
-        String body =
-                "{\"signature\":\""
-                        + signed.signature()
-                        + "\",\"name\":\""
-                        + walletName
-                        + "\",\"type\":\""
-                        + walletTypeRaw
-                        + "\",\"is_managed\":true}";
+        // Built with the mapper rather than concatenated. Both interpolated values
+        // happen to be constrained today (the type is enum-validated, the name is
+        // generated), but a hand-written JSON string is one edit away from an
+        // injection bug and nothing in the code says otherwise.
+        ObjectNode payload = JSON.createObjectNode();
+        payload.put("signature", signed.signature());
+        payload.put("name", walletName);
+        payload.put("type", walletTypeRaw);
+        payload.put("is_managed", true);
+        String body = payload.toString();
         System.out.println(
                 "Wallet created. Response: "
                         + postJson(baseUrl + "/v1/accounts/wallets", token, body));
@@ -118,15 +120,16 @@ public final class Main {
                     "OAuth token exchange failed: " + resp.statusCode() + " " + resp.body());
         }
 
-        // Naive extraction, matching the Kotlin example. Production code should
-        // use a real JSON parser. The token endpoint returns
-        // {"access_token":"...","token_type":"Bearer",...}.
-        Matcher m = ACCESS_TOKEN.matcher(resp.body());
-        if (!m.find()) {
+        // The token endpoint returns {"access_token":"...","token_type":"Bearer",...}.
+        // Parsed, not regexed: a regex over the raw body mis-handles any escape
+        // sequence inside the token and can match the literal text "access_token"
+        // somewhere else in the response.
+        JsonNode token = JSON.readTree(resp.body()).path("access_token");
+        if (!token.isTextual() || token.asText().isBlank()) {
             throw new IllegalStateException(
                     "OAuth response did not contain access_token: " + resp.body());
         }
-        return m.group(1);
+        return token.asText();
     }
 
     private static String postJson(String url, String bearer, String body) throws Exception {

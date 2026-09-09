@@ -140,6 +140,26 @@ regenerate every fixture in one commit. Do not mix.
 and member the SDK exposes, including generic signatures, sealed `permits`
 clauses, and record accessors.
 
+It also records the JPMS module descriptor from
+`sdk/src/main/java/module-info.java` as its first stanza. Dropping an `exports`
+breaks every consumer of that package just as surely as deleting a class, so it
+belongs in the same gate. `module-info.class` itself is skipped by the class walk
+(it has `ACC_MODULE` set and is not loadable by `Class.forName`); the stanza is
+rendered from `ModuleDescriptor.read` instead.
+
+The stanza covers `requires` (with modifiers), `exports`, `opens`, and
+`provides`. Qualified directives render their targets — `exports foo to bar`, not
+just `exports foo` — because narrowing an unqualified export to a qualified one
+breaks every consumer except the named module, and the two would otherwise be
+indistinguishable. `uses` is deliberately excluded: it declares what this module
+consumes, which is an implementation detail rather than part of the contract
+offered to consumers.
+
+Adding a class to `xyz.tesser.sdk.java.internal.*` produces no lockfile diff:
+that package tree is excluded from the dump *and* unexported by the module
+descriptor, which is what makes it genuinely internal rather than merely
+undocumented.
+
 sdk-kotlin uses the Kotlin
 [`binary-compatibility-validator`](https://github.com/Kotlin/binary-compatibility-validator)
 for this. That plugin only registers its tasks for Kotlin compilations —
@@ -179,6 +199,14 @@ release blocks until cutting a release; the release runbook does that.
 
 Releases are manual. There is no push-triggered publish — merging to `main`
 never releases anything.
+
+**Before the first release**, work through
+[One-time setup](#one-time-setup-before-the-first-real-release). The workflow is
+committed but inert until the repository is configured, and one of those steps —
+granting the workflow write access — fails *after* the artifact is already
+permanently published if it is missed.
+
+Every release after that:
 
 1. Bump `version=` in `gradle.properties`.
 2. In `CHANGELOG.md`, rename `Unreleased` to the new version and add the date.
@@ -230,13 +258,98 @@ catches releasing a stale checkout.
 
 ### One-time setup (before the first real release)
 
-The release workflow is wired but inert until these are in place.
+The release workflow is committed but **inert** until all of the following are in
+place. Work through them in order; each one is independently verifiable.
 
-**1. Sonatype Central Portal account.** The `xyz.tesser` namespace is already
-verified for the Kotlin SDK, and namespaces are per-group, so `xyz.tesser:sdk-java`
-is covered by it. No new namespace work is needed.
+The dry run at the end is **partial coverage**, not a full rehearsal. It runs the
+verify build, GPG signing, and publication to Maven Local. It does *not* run the
+real-release validation step (branch, `confirm_version`, tag absence), the upload
+to the Central Portal, the tag push, or the GitHub release — all four are gated on
+`dry_run == false`. So a green dry run proves the build and signing work; it
+cannot tell you whether steps 2 and 3 below are configured correctly.
 
-**2. GPG key for Maven Central signing.**
+Quick audit of where the repo stands:
+
+```bash
+gh api repos/tesser-payments/sdk-java/actions/permissions            # expect enabled: true
+gh api repos/tesser-payments/sdk-java/actions/permissions/workflow   # expect "write"
+gh api repos/tesser-payments/sdk-java/actions/secrets -q '.secrets[].name'
+gh workflow list --repo tesser-payments/sdk-java                     # expect "Release" present
+```
+
+---
+
+#### 1. The workflow must exist on `main`
+
+`workflow_dispatch` is only offered for workflows present on the **default
+branch**, so "Actions → Release → Run workflow" does not appear until
+`.github/workflows/release.yml` is merged. Merging is safe: the workflow has no
+`push` trigger, so landing the file publishes nothing.
+
+If the button is missing after merging, confirm `main` really is the default
+branch (`gh repo view --json defaultBranchRef`).
+
+#### 2. Enable Actions and grant the workflow write access
+
+**Settings → Actions → General.**
+
+- **Actions permissions** — Actions must be enabled. On an org-owned repo this
+  can also be restricted at the org level; if the Actions tab is missing
+  entirely, that is where to look.
+- **Workflow permissions** — set to **"Read and write permissions"**.
+
+The second one is the step most likely to be missed, and it fails at the worst
+possible moment. The release job pushes the `v<version>` tag and calls
+`gh release create`; both need `contents: write`. `release.yml` declares
+`permissions: contents: write` at workflow level, but that declaration interacts
+with the repository default, and GitHub's own documentation is not explicit about
+which wins: it says only that a restricted default "will apply to the relevant
+repositories" and that org owners "can restrict write access for the
+`GITHUB_TOKEN` at the repository level".
+
+Rather than depend on resolving that, set the default to write. If the repository
+default does cap the workflow declaration, a release with it left on read-only
+uploads to Maven Central successfully and *then* `403`s on the tag push — after
+the version is already permanent and cannot be re-published. Setting it to write
+costs nothing and removes the question entirely.
+
+Note that a dry run cannot reassure you here: it never reaches the tagging step.
+If you want certainty before a real release, trigger a dry run and read the
+`GITHUB_TOKEN Permissions` block that Actions prints in the job's "Set up job"
+log — that shows the effective permissions the token was actually granted.
+
+Check and fix from the CLI:
+
+```bash
+gh api repos/tesser-payments/sdk-java/actions/permissions/workflow
+# {"default_workflow_permissions":"read", ...}   <- set this to write
+
+gh api -X PUT repos/tesser-payments/sdk-java/actions/permissions/workflow \
+  -f default_workflow_permissions=write \
+  -F can_approve_pull_request_reviews=false
+```
+
+`can_approve_pull_request_reviews` stays `false`; nothing here needs it.
+
+#### 3. Check for rules that block tags
+
+If you later protect `main` or add rulesets, note that the release job pushes a
+tag rather than a branch. Branch protection on `main` does not affect it, but a
+**tag ruleset** matching `refs/tags/v*` will — a "restrict creations" rule blocks
+the push unless `github-actions[bot]` is in the bypass list.
+
+There are no rulesets on this repo today, so nothing to do unless you add some:
+
+```bash
+gh api repos/tesser-payments/sdk-java/rulesets -q '.[].name'
+```
+
+#### 4. Sonatype Central Portal account
+
+The `xyz.tesser` namespace is already verified, and namespaces are per-group, so
+`xyz.tesser:sdk-java` is covered by it. No new namespace work is needed.
+
+#### 5. GPG key for Maven Central signing
 
 ```bash
 gpg --full-generate-key                                    # RSA 4096; passphrase recommended
@@ -246,9 +359,15 @@ gpg --export-secret-keys --armor <key-id> | base64         # export for CI
 ```
 
 Maven Central refuses artifacts signed with a key whose public half is not
-discoverable on a public keyserver.
+discoverable on a public keyserver. Publishing to a keyserver can take a few
+minutes to propagate, so do this before the first real release rather than
+during it.
 
-**3. GitHub repo secrets.** Settings → Secrets and variables → Actions:
+#### 6. Repository secrets
+
+**Settings → Secrets and variables → Actions.** All four are required; the
+workflow fails fast if `GPG_PRIVATE_KEY_B64` is missing, but the others surface
+as an authentication error partway through the upload.
 
 | Secret | What it is | Where to get it |
 |---|---|---|
@@ -257,26 +376,56 @@ discoverable on a public keyserver.
 | `GPG_PRIVATE_KEY_B64` | Base64 of the ASCII-armored secret signing key | `gpg --export-secret-keys --armor <key-id> \| base64`. On Linux use `base64 -w0` (single line); macOS `base64` is single-line already. Base64 exists so the multi-line PEM survives GitHub's secret pipeline without CRLF/whitespace mangling that breaks Bouncy Castle's PGP parser. |
 | `GPG_PASSPHRASE` | Passphrase of that GPG key | Whatever the key was created with. |
 
-If sdk-java uses the same Sonatype account and GPG key as sdk-kotlin, use the
-same four values — but recover them from wherever sdk-kotlin's were sourced
-(password manager / keychain), since GitHub does not let you read a secret back
-after saving. Better: configure them once as **organization** secrets on
-`tesser-payments` scoped to both repos. One rotation point, no per-repo drift;
-the workflow needs no change, because `secrets.X` resolves org secrets
-transparently.
+If another `xyz.tesser` artifact already publishes with the same Sonatype account
+and GPG key, reuse those values — but recover them from wherever they were
+originally stored (password manager / keychain), since GitHub does not let you
+read a secret back after saving.
+
+Better still, configure them once as **organization** secrets on
+`tesser-payments`. One rotation point, no per-repo drift, and the workflow needs
+no change because `secrets.X` resolves org secrets transparently. Two caveats:
+
+- Org secrets have three visibility settings: **All repositories** (`all`),
+  **Private repositories** (`private`), and **Selected repositories**
+  (`selected`). This repo is private, so the first two both reach it; with
+  `selected` you must add this repository to the list explicitly, or the
+  workflow sees nothing.
+- Secrets are never exposed to workflow runs triggered from a fork, so a release
+  can only be cut from a branch in this repo.
+
+Verify they landed (values are never readable, only names). Repository secrets
+and organization secrets are separate endpoints, and the first does **not** show
+the second — so if you took the org-secret route, the repo-scoped command
+returning nothing is expected, not a problem:
+
+```bash
+gh api repos/tesser-payments/sdk-java/actions/secrets -q '.secrets[].name'
+gh api repos/tesser-payments/sdk-java/actions/organization-secrets -q '.secrets[].name'
+```
+
+The second lists exactly the org secrets *this repository* can see, which is the
+thing that actually matters — it already accounts for the visibility setting
+above. Between them the four names must all appear.
 
 Nothing else needs configuring. `GH_TOKEN` uses the built-in `github.token`, and
-the workflow declares `permissions: contents: write` so it can push the tag and
-create the release. The `ORG_GRADLE_PROJECT_*` variables are constructed inside
-the workflow from the secrets — you never add those to GitHub yourself.
+the `ORG_GRADLE_PROJECT_*` variables Gradle expects are constructed inside the
+workflow from the secrets above — you never add those to GitHub yourself.
+
+#### Setup checklist
+
+| | Check | How to confirm |
+|---|---|---|
+| 1 | `release.yml` is on the default branch | "Release" appears under the Actions tab |
+| 2 | Actions enabled, workflow permissions = **write** | `gh api repos/OWNER/REPO/actions/permissions/workflow` |
+| 3 | No tag ruleset blocking `refs/tags/v*` | `gh api repos/OWNER/REPO/rulesets` |
+| 4 | Sonatype user token generated | Portal → Account |
+| 5 | GPG key published to a keyserver | `gpg --keyserver keys.openpgp.org --recv-keys <key-id>` from a clean machine |
+| 6 | Four secrets present | `gh api repos/OWNER/REPO/actions/secrets` |
+| 7 | Dry run green with a `.asc` per artifact (partial coverage — see above) | See below |
 
 ### Verifying with a dry run
 
-The workflow must be on `main` before the "Run workflow" button appears —
-`workflow_dispatch` is only offered for workflows present on the default branch.
-Merging is safe: with no `push` trigger, merging the file does nothing.
-
-Once merged and the secrets exist, run it with `dry_run` checked. Expected:
+Once steps 1–6 are done, run the workflow with `dry_run` checked. Expected:
 
 - `gate` reads the version and **skips** the validation step (dry runs are exempt).
 - `publish` runs the full verify build, then `:sdk:publishToMavenLocal`, then
@@ -295,12 +444,39 @@ Failure modes worth recognising:
 | `GPG_PRIVATE_KEY_B64 secret is empty or unset` | Secrets not configured, or the run targeted a fork | Add the secrets to the repo (or the org). |
 | `confirm_version (...) does not match gradle.properties` | Stale checkout, or a typo | Confirm what `main` actually has in `gradle.properties`. |
 | `Tag vX.Y.Z already exists` | That version is already released | Bump `version=` in `gradle.properties` first. |
+| `403` on `git push origin vX.Y.Z` | Effective token permissions are read-only, **or** a tag ruleset restricting creations on `refs/tags/v*`, **or** an org/enterprise policy capping the token | Check all three: setup step 2 for the repo default, setup step 3 for the ruleset, then org settings. A ruleset rejects the push even when the token has `contents: write`. |
+| `403` on `gh release create` | Effective token permissions are read-only | Setup step 2, then org/enterprise policy. Rulesets do not affect this call, so if the tag push succeeded and only this failed, it is the token. |
+| The "Release" workflow is not listed under Actions | The file is not on the default branch, or Actions is disabled | Setup steps 1 and 2. |
 
 ### If a release fails midway
 
 | Symptom | Recovery |
 |---|---|
 | The verify build fails (test / spotless / apiCheck) | Nothing was published. Fix on `main` and re-run the workflow. |
-| Publish succeeded but tagging failed | The artifact is on Maven Central but the tag was not created. Create it manually (`git tag vX.Y.Z && git push origin vX.Y.Z`), then bump to the next version for further work. Do not re-run the publish: the version cannot be overwritten. |
+| Publish succeeded but tagging failed | See below — the artifact is permanent, so the tag must point at the commit that produced it. |
 | Workflow seems hung | Check the Actions log. The Sonatype Central Portal API is occasionally slow during high traffic; uploads can stall but typically recover within roughly 10 minutes. |
 | The Central Portal shows a staged-but-not-released bundle | Check the bundle status in the Portal UI; a stuck staging bundle can usually be dropped there. |
+
+#### Recovering from a publish-succeeded-but-tagging-failed run
+
+The artifact is on Maven Central and cannot be replaced, so the tag has to point
+at the exact commit that produced it. **Do not** run a bare `git tag vX.Y.Z`:
+that tags whatever `HEAD` happens to be, and if `main` has moved on since the
+failed run, the tag will claim to be the released version while pointing at
+source that was never published.
+
+Take the SHA from the failed run:
+
+```bash
+gh run list --workflow Release --limit 5          # find the failed run
+SHA=$(gh run view <run-id> --json headSha -q .headSha)
+
+git fetch origin
+git tag "vX.Y.Z" "$SHA"                           # tag the published commit, not HEAD
+git push origin "vX.Y.Z"
+gh release create "vX.Y.Z" --generate-notes       # the workflow's other missing step
+```
+
+Then fix the cause before the next release — usually workflow permissions
+(setup step 2) or a tag ruleset (setup step 3). **Do not re-run the publish:** the
+version cannot be overwritten, and the run would fail at the Portal anyway.

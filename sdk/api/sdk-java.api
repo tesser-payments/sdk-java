@@ -1,3 +1,12 @@
+module xyz.tesser.sdk.java {
+    exports xyz.tesser.sdk.java
+    exports xyz.tesser.sdk.java.error
+    requires com.fasterxml.jackson.databind
+    requires mandated java.base
+    requires org.bouncycastle.provider
+    requires org.slf4j
+}
+
 public final record xyz.tesser.sdk.java.CreateWalletParams {
     extends java.lang.Record
     public final boolean xyz.tesser.sdk.java.CreateWalletParams.equals(java.lang.Object)

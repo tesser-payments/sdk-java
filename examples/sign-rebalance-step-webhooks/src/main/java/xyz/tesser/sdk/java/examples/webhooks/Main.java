@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URLEncoder;
@@ -17,8 +18,6 @@ import java.time.Duration;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import xyz.tesser.sdk.java.LocalSigner;
 import xyz.tesser.sdk.java.SignedStepResult;
 import xyz.tesser.sdk.java.SigningConfig;
@@ -38,8 +37,10 @@ import xyz.tesser.sdk.java.StepForSigning;
  *       {@code data.object.status} rather than envelope type, so the example doesn't care which
  *       specific event type carries the terminal state).
  *   <li>POST {@code /v1/treasury/rebalances} with the rebalance request body built from env.
- *   <li>Wait for the {@code step.signature_requested} webhook event.
- *   <li>Sign the step locally with {@code LocalSigner.signStep}.
+ *   <li>Wait for a {@code step.signature_requested} webhook event <i>for the rebalance this run
+ *       created</i>.
+ *   <li>Re-read the step over an authenticated {@code GET /v1/treasury/rebalances/{id}} and sign
+ *       <i>that</i> with {@code LocalSigner.signStep}.
  *   <li>POST the signature to {@code /v1/treasury/rebalances/{id}/steps/{stepId}/sign}.
  *   <li>Wait for a step event carrying {@code data.object.status == "completed"}.
  *   <li>Print the final step summary (using {@code completed_at}) and shut down.
@@ -51,16 +52,34 @@ import xyz.tesser.sdk.java.StepForSigning;
  * ./gradlew :examples:sign-rebalance-step-webhooks:run
  * </pre>
  *
- * <p>Webhook signature verification is intentionally not implemented yet (the verification
- * algorithm hasn't been documented in the public Tesser docs at the time of writing); never run
- * this against production until that path is added.
+ * <h2>Why the webhook payload is never signed</h2>
+ *
+ * <p>Webhook signature verification is intentionally not implemented yet — the verification
+ * algorithm is not documented in the public Tesser docs at the time of writing — so every POST that
+ * reaches this listener is untrusted, and the listener is reachable by anyone who finds the tunnel
+ * URL. The event is therefore used only as a <i>trigger</i>: it tells the example when to look, and
+ * which rebalance and step to look for, and its {@code rebalance_id} is checked against the id
+ * returned by {@code createRebalance} so a forged or stale event is skipped. The bytes that
+ * actually get signed always come back from an authenticated GET, exactly as in the polling
+ * example. A forged webhook can at worst make this program perform a redundant GET.
+ *
+ * <p>That still leaves the listener unauthenticated. Add signature verification before running
+ * anything like this against production.
  */
 public final class Main {
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    private static final Pattern ACCESS_TOKEN =
-            Pattern.compile("\"access_token\"\\s*:\\s*\"([^\"]+)\"");
+    /** Largest webhook body accepted. A step event is a few hundred bytes. */
+    private static final int MAX_BODY_BYTES = 64 * 1024;
+
+    /** How many unconsumed events to hold before shedding load. */
+    private static final int EVENT_QUEUE_CAPACITY = 256;
+
+    /** How long to let the authenticated read catch up with a webhook event. */
+    private static final Duration STEP_READ_TIMEOUT = Duration.ofSeconds(30);
+
+    private static final Duration STEP_READ_POLL_INTERVAL = Duration.ofSeconds(1);
 
     private Main() {}
 
@@ -78,8 +97,23 @@ public final class Main {
                             + rebalanceId
                             + " ...");
             JsonNode signatureRequested =
-                    listener.awaitEventOfType("step.signature_requested", Duration.ofSeconds(60));
-            StepForSigning step = buildStepForSigning(config, token, signatureRequested);
+                    listener.awaitEventWhere(
+                            Duration.ofSeconds(60),
+                            "type=step.signature_requested rebalance_id=" + rebalanceId,
+                            envelope ->
+                                    "step.signature_requested"
+                                                    .equals(envelope.path("type").asText(null))
+                                            // Binding the event to this run's rebalance is what
+                                            // makes a forged or left-over event harmless: without
+                                            // it, the first signature_requested event of *any*
+                                            // rebalance would be accepted.
+                                            && rebalanceId.equals(
+                                                    envelope.path("data")
+                                                            .path("object")
+                                                            .path("rebalance_id")
+                                                            .asText(null)));
+            String stepId = requireString(signatureRequested.path("data").path("object"), "id");
+            StepForSigning step = fetchStepForSigning(config, token, rebalanceId, stepId);
 
             System.out.printf(
                     "Signing step %s for transfer %s (signWith=%s, network=%s) ...%n",
@@ -92,17 +126,27 @@ public final class Main {
 
             System.out.println(
                     "Waiting for step " + step.id() + " to reach `status=completed` ...");
-            JsonNode completed =
-                    listener.awaitEventWhere(
-                            Duration.ofMinutes(5),
-                            "step " + step.id() + " status=completed",
-                            envelope -> {
-                                JsonNode stepObject = envelope.path("data").path("object");
-                                return step.id().equals(stepObject.path("id").asText(null))
-                                        && "completed"
-                                                .equals(stepObject.path("status").asText(null));
-                            });
-            printCompletedStep(completed);
+            listener.awaitEventWhere(
+                    Duration.ofMinutes(5),
+                    "step " + step.id() + " status=completed",
+                    envelope -> {
+                        JsonNode stepObject = envelope.path("data").path("object");
+                        return step.id().equals(stepObject.path("id").asText(null))
+                                && "completed".equals(stepObject.path("status").asText(null));
+                    });
+            // Same rule as for signing: the event says when to look, the API says
+            // what is true. Printing "complete" straight off the webhook would let
+            // a forged event report a success that never happened — and a single
+            // unchecked GET would do the same thing whenever the read lags the
+            // event, so this waits for the API to actually report `completed`.
+            printCompletedStep(
+                    awaitStep(
+                            config.tesserBaseUrl(),
+                            token,
+                            rebalanceId,
+                            step.id(),
+                            Main::isCompleted,
+                            "to report `status=completed`"));
         }
     }
 
@@ -163,15 +207,17 @@ public final class Main {
     // =========================================================================
 
     /**
-     * Buffers incoming webhook envelopes onto an unbounded queue so callers can pull events by
-     * {@code type} in arrival order. Unbounded so events that arrive between awaits (e.g. {@code
-     * step.submitted} and {@code step.confirmed} while we're waiting for {@code step.completed})
-     * aren't dropped.
+     * Buffers incoming webhook envelopes onto a queue so callers can pull events by {@code type} in
+     * arrival order. Buffered rather than handed straight to the waiter so events that arrive
+     * between awaits (e.g. {@code step.submitted} and {@code step.confirmed} while we're waiting
+     * for {@code step.completed}) aren't dropped.
      *
      * <p>The Kotlin original uses an unlimited coroutine {@code Channel} plus {@code withTimeout}.
-     * {@link LinkedBlockingQueue} is the direct equivalent of the former; the latter becomes a
-     * timed {@link LinkedBlockingQueue#poll} against a deadline computed once, so a non-matching
-     * event does not restart the full timeout.
+     * {@link LinkedBlockingQueue} is the direct equivalent of the former, except that the capacity
+     * is bounded here: the Kotlin example's channel is fed by a private listener, whereas this one
+     * is reachable from the public internet through the tunnel, where "unlimited" is a
+     * memory-growth primitive. The timeout becomes a timed {@link LinkedBlockingQueue#poll} against
+     * a deadline computed once, so a non-matching event does not restart the full timeout.
      */
     private static final class WebhookListener implements AutoCloseable {
 
@@ -184,7 +230,7 @@ public final class Main {
         }
 
         static WebhookListener start(int port) throws IOException {
-            LinkedBlockingQueue<JsonNode> events = new LinkedBlockingQueue<>();
+            LinkedBlockingQueue<JsonNode> events = new LinkedBlockingQueue<>(EVENT_QUEUE_CAPACITY);
             HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
             // Register at "/" so any incoming path works (whcli, ngrok, and
             // similar tunnels typically forward to the bare target URL with no
@@ -213,13 +259,24 @@ public final class Main {
                     exchange.sendResponseHeaders(405, -1);
                     return;
                 }
-                String body =
-                        new String(
-                                exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+                // Bounded read. This endpoint is public by design (that is what the
+                // tunnel is for), so an unbounded readAllBytes() into an unbounded
+                // queue lets any POST storm grow the heap without limit. A step
+                // event is a few hundred bytes; 64 KiB is generous.
+                byte[] raw = readBounded(exchange, MAX_BODY_BYTES);
+                if (raw == null) {
+                    System.out.println(
+                            "  webhook rejected: body over " + MAX_BODY_BYTES + " bytes");
+                    exchange.sendResponseHeaders(413, -1);
+                    return;
+                }
+                String body = new String(raw, StandardCharsets.UTF_8);
                 // TODO: verify the webhook signature header before trusting the payload.
                 //   The exact header name and algorithm aren't currently documented in
                 //   the public Tesser docs; until verification lands, this handler accepts
-                //   every incoming POST. Do NOT run against production.
+                //   every incoming POST. Nothing from the payload is ever signed --
+                //   see the class Javadoc -- but the listener is still unauthenticated.
+                //   Do NOT run against production.
                 JsonNode envelope = JSON.readTree(body);
                 System.out.println(
                         "  webhook received: path="
@@ -228,7 +285,14 @@ public final class Main {
                                 + envelope.path("type").asText(null)
                                 + " id="
                                 + envelope.path("id").asText(null));
-                events.offer(envelope);
+                if (!events.offer(envelope)) {
+                    // Bounded queue: a flood of junk POSTs is dropped rather than
+                    // retained. Real events are consumed within seconds, so a full
+                    // queue means something is spamming the tunnel.
+                    System.out.println("  webhook dropped: event queue full");
+                    exchange.sendResponseHeaders(503, -1);
+                    return;
+                }
                 exchange.sendResponseHeaders(204, -1);
             } catch (Exception e) {
                 System.out.println(
@@ -241,17 +305,6 @@ public final class Main {
             } finally {
                 exchange.close();
             }
-        }
-
-        /**
-         * Takes events off the queue, discarding any whose {@code type} doesn't match. Throws if
-         * the timeout elapses before a matching event arrives.
-         */
-        JsonNode awaitEventOfType(String type, Duration timeout) throws InterruptedException {
-            return awaitEventWhere(
-                    timeout,
-                    "type=" + type,
-                    envelope -> type.equals(envelope.path("type").asText(null)));
         }
 
         /**
@@ -289,6 +342,24 @@ public final class Main {
                                 + " id="
                                 + envelope.path("id").asText(null)
                                 + ")");
+            }
+        }
+
+        /**
+         * Reads at most {@code max} bytes of the request body, or returns null if the body is
+         * larger.
+         *
+         * <p>{@code Content-Length} is not trusted as the limit — it is attacker-controlled and may
+         * be absent under chunked encoding — so the read itself is capped and one extra byte is
+         * probed to tell "exactly max" from "over max".
+         */
+        private static byte[] readBounded(HttpExchange exchange, int max) throws IOException {
+            try (InputStream in = exchange.getRequestBody()) {
+                byte[] body = in.readNBytes(max);
+                if (body.length == max && in.read() != -1) {
+                    return null;
+                }
+                return body;
             }
         }
 
@@ -335,28 +406,112 @@ public final class Main {
         return rebalanceId;
     }
 
-    private static StepForSigning buildStepForSigning(
-            ExampleConfig config, String token, JsonNode event) throws Exception {
-        JsonNode stepDto = event.path("data").path("object");
-        if (stepDto.isMissingNode() || stepDto.isNull()) {
-            throw new IllegalStateException("Webhook event missing data.object: " + event);
-        }
+    /**
+     * Builds the step to sign from an authenticated {@code GET}, using the webhook only to know
+     * which rebalance and step to fetch.
+     *
+     * <p>Nothing that ends up inside the signature originates from the webhook body. Taking {@code
+     * unsigned_transaction} straight off the POST would mean this program signs whatever bytes an
+     * unauthenticated caller put there, with the enclave key, and then submits the result to the
+     * real API — the transaction is the one thing that must not come from an untrusted source.
+     */
+    private static StepForSigning fetchStepForSigning(
+            ExampleConfig config, String token, String rebalanceId, String stepId)
+            throws Exception {
+        JsonNode stepDto =
+                awaitStep(
+                        config.tesserBaseUrl(),
+                        token,
+                        rebalanceId,
+                        stepId,
+                        Main::hasUnsignedTransaction,
+                        "to carry an `unsigned_transaction`");
         // Use the user-facing account/network we sent on the rebalance request,
-        // not the step DTO's `from_account_id` / `from_network`. The webhook
-        // step's `from_account_id` is Tesser's internal wallet-account id which
+        // not the step DTO's `from_account_id` / `from_network`. The step's
+        // `from_account_id` is Tesser's internal wallet-account id which
         // doesn't resolve via `GET /v1/accounts/{id}`.
         String fromAccountId = config.rebalance().fromAccountId();
         String network = config.rebalance().fromNetwork();
         String signWith = fetchCryptoWalletAddress(config.tesserBaseUrl(), token, fromAccountId);
         return new StepForSigning(
                 requireString(stepDto, "id"),
-                // Webhook step DTO uses `rebalance_id` for the parent UUID; the
-                // GET response uses `transfer_id` for the same value. Read
-                // `rebalance_id` here since this code is fed by the webhook event.
-                requireString(stepDto, "rebalance_id"),
+                // The GET response names the parent UUID `transfer_id`; the webhook
+                // step DTO calls the same value `rebalance_id`. This is fed by the GET.
+                requireString(stepDto, "transfer_id"),
                 requireString(stepDto, "unsigned_transaction"),
                 signWith,
                 network);
+    }
+
+    /**
+     * Polls the authenticated API until the step satisfies {@code condition}.
+     *
+     * <p>A single GET is not enough, because a webhook can beat the read-your-writes window in both
+     * directions: just after {@code step.signature_requested} the step may exist with no {@code
+     * unsigned_transaction} yet, and just after a {@code completed} event it may still report the
+     * previous status. Both callers need the same retry and differ only in what they are waiting
+     * for, so the condition is a parameter rather than a second copy of this loop.
+     *
+     * <p>A step the read cannot see at all counts as an unsatisfied condition, not an error. That
+     * is the same lag one step further along, so letting it escape would abort precisely the case
+     * this loop exists to absorb; the deadline decides instead.
+     */
+    private static JsonNode awaitStep(
+            String baseUrl,
+            String token,
+            String rebalanceId,
+            String stepId,
+            Predicate<JsonNode> condition,
+            String waitingFor)
+            throws Exception {
+        long deadlineNanos = System.nanoTime() + STEP_READ_TIMEOUT.toNanos();
+        while (true) {
+            JsonNode candidate = findStepById(baseUrl, token, rebalanceId, stepId);
+            if (candidate != null && condition.test(candidate)) {
+                return candidate;
+            }
+            if (System.nanoTime() - deadlineNanos >= 0) {
+                throw new IllegalStateException(
+                        "Timed out after "
+                                + STEP_READ_TIMEOUT
+                                + " waiting for step "
+                                + stepId
+                                + " of rebalance "
+                                + rebalanceId
+                                + " "
+                                + (candidate == null
+                                        ? "to appear in the rebalance at all. It was never "
+                                                + "returned by GET /v1/treasury/rebalances/"
+                                                + rebalanceId
+                                        : waitingFor + ". Last read: " + candidate));
+            }
+            Thread.sleep(STEP_READ_POLL_INTERVAL.toMillis());
+        }
+    }
+
+    private static boolean hasUnsignedTransaction(JsonNode step) {
+        String unsignedTx = step.path("unsigned_transaction").asText(null);
+        return unsignedTx != null && !unsignedTx.isBlank();
+    }
+
+    private static boolean isCompleted(JsonNode step) {
+        return "completed".equals(step.path("status").asText(null));
+    }
+
+    /**
+     * Reads one step of a rebalance over the authenticated API, or null if the rebalance does not
+     * (yet) list a step with that id. Null rather than an exception because the only caller is a
+     * retry loop, for which "not there yet" is an ordinary intermediate state.
+     */
+    private static JsonNode findStepById(
+            String baseUrl, String token, String rebalanceId, String stepId) throws Exception {
+        String response = getJson(baseUrl + "/v1/treasury/rebalances/" + rebalanceId, token);
+        for (JsonNode candidate : JSON.readTree(response).path("data").path("steps")) {
+            if (stepId.equals(candidate.path("id").asText(null))) {
+                return candidate;
+            }
+        }
+        return null;
     }
 
     private static String fetchCryptoWalletAddress(String baseUrl, String token, String accountId)
@@ -386,16 +541,13 @@ public final class Main {
         return response;
     }
 
-    private static void printCompletedStep(JsonNode event) {
-        JsonNode stepObject = event.path("data").path("object");
-        if (stepObject.isMissingNode() || stepObject.isNull()) {
-            throw new IllegalStateException("Completion event missing data.object: " + event);
-        }
+    /** Takes the step DTO from the API, not the webhook envelope. */
+    private static void printCompletedStep(JsonNode stepDto) {
         System.out.printf(
                 "Rebalance complete. step.id=%s status=%s completed_at=%s%n",
-                stepObject.path("id").asText(null),
-                stepObject.path("status").asText(null),
-                stepObject.path("completed_at").asText(null));
+                stepDto.path("id").asText(null),
+                stepDto.path("status").asText(null),
+                stepDto.path("completed_at").asText(null));
     }
 
     // =========================================================================
@@ -462,12 +614,15 @@ public final class Main {
             throw new IllegalStateException(
                     "OAuth token exchange failed: " + resp.statusCode() + " " + resp.body());
         }
-        Matcher m = ACCESS_TOKEN.matcher(resp.body());
-        if (!m.find()) {
+        // Parsed, not regexed: a regex over the raw body mis-handles any escape
+        // sequence inside the token and can match the literal text "access_token"
+        // somewhere else in the response.
+        JsonNode token = JSON.readTree(resp.body()).path("access_token");
+        if (!token.isTextual() || token.asText().isBlank()) {
             throw new IllegalStateException(
                     "OAuth response did not contain access_token: " + resp.body());
         }
-        return m.group(1);
+        return token.asText();
     }
 
     private static String getJson(String url, String bearer) throws Exception {

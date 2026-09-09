@@ -71,8 +71,35 @@ troubleshooting.
   `STABLECOIN_STELLAR`. Ethereum is exercised end-to-end against Tesser
   staging. Solana and Stellar are not yet verified against the live API.
 - Sealed `TesserError` hierarchy. The signer reports `ConfigError` for bad
-  input (blank keys, unknown wallet type) and `SigningError` for any
-  cryptographic failure.
+  input (blank keys, a mismatched key pair, an unknown wallet type) and
+  `SigningError` for any cryptographic failure.
+- A JPMS module descriptor. The published jar is the named module
+  `xyz.tesser.sdk.java` and exports only `xyz.tesser.sdk.java` and
+  `xyz.tesser.sdk.java.error`; `xyz.tesser.sdk.java.internal.*` is `public` only
+  because Java has no `internal` keyword, and the descriptor makes it genuinely
+  unreachable from a modular consumer.
+
+## Key handling
+
+Two things are worth knowing before you construct a `SigningConfig`:
+
+- **The key pair is checked at construction.** `LocalSigner` derives the public
+  point from `privateKey` and compares it to `publicKey`, failing with
+  `ConfigError` if they are not a pair. Without that check a mismatch produces a
+  perfectly well-formed stamp that authenticates nowhere, and you find out from
+  an opaque rejection several hops away. Points are compared, not hex, so an
+  uppercase or uncompressed encoding of the correct key is fine.
+- **The private key stays in the heap.** `SigningConfig.privateKey` is a
+  `String`: immutable, possibly interned, and visible in a heap dump for as long
+  as the config is reachable. `toString()` masks it, so an incidental log line
+  or properties dump will not leak it, but the SDK cannot erase the value
+  itself. Treat any component holding a `SigningConfig` as holding key material.
+
+ECDSA nonces are RFC 6979 deterministic, so signing the same body with the same
+key twice produces the same signature. This is invisible on the wire — a
+verifier checks `(r, s)` against the public key and cannot tell how `k` was
+derived — and it removes the failure mode where a weak or misseeded
+`SecureRandom` would leak the private scalar.
 
 ## Future semantics
 
@@ -89,15 +116,17 @@ knowing, and all three are pinned by tests so they cannot regress:
   missing Bouncy Castle, an `OutOfMemoryError` — still propagate from the call
   site, because catching them to stuff into a future would do more harm than
   good. The one deliberate exception is `LocalSigner`'s constructor, which
-  throws `IllegalArgumentException` eagerly for a blank key: construction is not
-  a future-returning operation.
+  validates eagerly — `IllegalArgumentException` for a blank field,
+  `TesserError.ConfigError` for a malformed or mismatched key pair. Construction
+  is not a future-returning operation, and a configuration error is worth
+  finding once at startup rather than on every call.
 - **`LocalSigner` is thread-safe and reentrant.** It holds no mutable state, so
   a single instance can be shared freely.
 
 ### Unwrapping errors
 
-This is the one place the API is less pleasant than the Kotlin SDK, where
-callers write `catch (e: TesserError.ConfigError)` directly.
+`CompletableFuture` wraps every failure, so you cannot catch a `TesserError`
+subtype directly at the call site.
 
 > On failure, `get()` throws `ExecutionException` and `join()` throws
 > `CompletionException`; in both cases the `TesserError` is `getCause()`.
@@ -112,19 +141,10 @@ try {
 }
 ```
 
-## Relationship to the Kotlin SDK
+## Reporting a vulnerability
 
-This SDK produces the **same wire output** as
-[`xyz.tesser:sdk`](https://github.com/tesser-payments/sdk-kotlin), the Kotlin
-SDK. That is not an aspiration: `GoldenBodyParityTest` asserts the assembled
-activity body is byte-identical to what the Kotlin SDK emits, across seven
-wallet cases and all seven supported networks, against fixtures generated from
-the real Kotlin SDK. `JsonEscapingParityTest` does the same for the JSON writer
-across a corpus of hostile strings. Byte-identity is the whole claim, because
-the signature is base64 of that exact text.
-
-The package root is `xyz.tesser.sdk.java`, not `xyz.tesser.sdk`, so both SDKs
-can sit on one classpath without collision.
+See [SECURITY.md](./SECURITY.md). Please do not open a public issue for a
+security report.
 
 ## Contributing
 

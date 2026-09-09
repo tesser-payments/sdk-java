@@ -1,0 +1,27 @@
+# Dependency updates are opened as PRs rather than applied automatically: this
+# is a signing SDK, and a Jackson or Bouncy Castle bump is a change to what gets
+# put on the wire, so it goes through review and the parity gate like any other
+# change.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Test-only churn is noise; batch it into one PR.
+      test-dependencies:
+        patterns:
+          - "org.junit*"
+          - "org.assertj:*"
+          - "org.mockito:*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    # Actions are pinned by commit SHA in the workflows. Dependabot understands
+    # that form and rewrites the SHA while keeping the `# vX.Y.Z` comment, so
+    # pinning does not have to be traded away to get updates.
+    open-pull-requests-limit: 5
