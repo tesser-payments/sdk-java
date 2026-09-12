@@ -33,7 +33,12 @@ import xyz.tesser.sdk.java.StepForSigning;
  *   <li>Sign the step locally with {@code LocalSigner.signStep}.
  *   <li>POST the signature to {@code /v1/treasury/rebalances/{id}/steps/{stepId}/sign}.
  *   <li>Poll the rebalance until the step's {@code status} is {@code completed} (or fail loudly if
- *       any step reports {@code failed_at}).
+ *       any step reports {@code failed_at}). Tesser marks a step {@code completed} only once the
+ *       transaction's block is <em>finalized</em> on the chain, which on Base Sepolia trails the
+ *       head by roughly 15-20 minutes. A step that is {@code confirmed} -- mined -- but not yet
+ *       {@code completed} when the wait expires is therefore reported with its {@code
+ *       transaction_hash} and treated as success: everything this harness exercises has happened by
+ *       then. Set {@code COMPLETION_WAIT_MINUTES} (default 5) to wait for finality.
  *   <li>Print the final step summary and shut down.
  * </ol>
  *
@@ -50,6 +55,15 @@ public final class Main {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
+
+    /**
+     * How long to wait for the signed step to reach {@code completed}. Tesser only marks a step
+     * completed once its block is finalized on the chain, which on Base Sepolia takes roughly 15-20
+     * minutes; the default deliberately does not wait that long (see {@link
+     * #pollUntilStepCompleted}).
+     */
+    private static final Duration COMPLETION_WAIT =
+            Duration.ofMinutes(Long.parseLong(optionalEnv("COMPLETION_WAIT_MINUTES", "5")));
 
     private Main() {}
 
@@ -179,10 +193,7 @@ public final class Main {
         String signWith = fetchCryptoWalletAddress(config.tesserBaseUrl(), token, fromAccountId);
         return new StepForSigning(
                 requireString(stepDto, "id"),
-                // The GET response uses `transfer_id` for the parent UUID; the
-                // webhook step DTO calls the same value `rebalance_id`. This
-                // code is fed by the GET, so read `transfer_id`.
-                requireString(stepDto, "transfer_id"),
+                parentRebalanceId(stepDto),
                 requireString(stepDto, "unsigned_transaction"),
                 signWith,
                 network);
@@ -216,11 +227,16 @@ public final class Main {
     }
 
     private static void printFinalStep(JsonNode stepDto) {
+        String status = stepDto.path("status").asText(null);
         System.out.printf(
-                "Rebalance complete. step.id=%s status=%s completed_at=%s%n",
+                "%s step.id=%s status=%s completed_at=%s transaction_hash=%s%n",
+                "completed".equals(status)
+                        ? "Rebalance complete."
+                        : "Rebalance step mined; awaiting chain finality.",
                 stepDto.path("id").asText(null),
-                stepDto.path("status").asText(null),
-                stepDto.path("completed_at").asText(null));
+                status,
+                stepDto.path("completed_at").asText(null),
+                stepDto.path("transaction_hash").asText(null));
     }
 
     // =========================================================================
@@ -297,7 +313,7 @@ public final class Main {
      */
     private static JsonNode pollUntilStepCompleted(
             String baseUrl, String token, String rebalanceId, String stepId) throws Exception {
-        Duration timeout = Duration.ofMinutes(5);
+        Duration timeout = COMPLETION_WAIT;
         long deadlineNanos = System.nanoTime() + timeout.toNanos();
         String lastReportedStatus = null;
 
@@ -323,6 +339,7 @@ public final class Main {
             String status = step.path("status").asText(null);
             String completedAt = step.path("completed_at").asText(null);
             String failedAt = step.path("failed_at").asText(null);
+            String transactionHash = step.path("transaction_hash").asText(null);
 
             if (!Objects.equals(status, lastReportedStatus)) {
                 System.out.println(
@@ -331,7 +348,9 @@ public final class Main {
                                 + " completed_at="
                                 + completedAt
                                 + " failed_at="
-                                + failedAt);
+                                + failedAt
+                                + " transaction_hash="
+                                + transactionHash);
                 lastReportedStatus = status;
             }
             if (failedAt != null) {
@@ -344,6 +363,22 @@ public final class Main {
                                 + statusReasons(step));
             }
             if ("completed".equals(status)) {
+                return step;
+            }
+            if (System.nanoTime() >= deadlineNanos && "confirmed".equals(status)) {
+                // `confirmed` means Tesser broadcast the signed transaction and saw it mined.
+                // `completed` is set by Tesser's finality tick only once the block is
+                // finalized on the chain -- on Base Sepolia roughly 15-20 minutes behind the
+                // head, well past the default wait. Local signing and the submit call -- what
+                // this harness verifies -- have both succeeded by now, so say so instead of
+                // failing.
+                System.out.printf(
+                        "WARNING: step %s is `confirmed` (transaction_hash=%s) but did not reach"
+                                + " `completed` within %s. Signing and submission succeeded; Tesser"
+                                + " marks the step completed once the block is finalized. Check"
+                                + " GET /v1/treasury/rebalances/%s later, or re-run with"
+                                + " COMPLETION_WAIT_MINUTES=30.%n",
+                        stepId, transactionHash, timeout, rebalanceId);
                 return step;
             }
             sleepUntilNextPoll(deadlineNanos, timeout, "step " + stepId + " to reach `completed`");
@@ -391,6 +426,23 @@ public final class Main {
             throw new IllegalStateException(onMissing);
         }
         return value.asText();
+    }
+
+    /**
+     * The parent rebalance id, which becomes the {@code {transferId}} path segment of the sign URL.
+     * The step's parent-id field is named after the resource that owns it: rebalance steps carry
+     * {@code rebalance_id} (payments {@code payment_id}, withdrawals {@code withdrawal_id}). Older
+     * API responses used {@code transfer_id} for all of them, so it is accepted as a fallback.
+     */
+    private static String parentRebalanceId(JsonNode stepDto) {
+        for (String field : new String[] {"rebalance_id", "transfer_id"}) {
+            JsonNode value = stepDto.path(field);
+            if (value.isTextual()) {
+                return value.asText();
+            }
+        }
+        throw new IllegalStateException(
+                "Missing required field `rebalance_id` (or legacy `transfer_id`) in: " + stepDto);
     }
 
     /** Pull a required string field directly out of a JSON object (no {@code data} envelope). */

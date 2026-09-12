@@ -435,9 +435,7 @@ public final class Main {
         String signWith = fetchCryptoWalletAddress(config.tesserBaseUrl(), token, fromAccountId);
         return new StepForSigning(
                 requireString(stepDto, "id"),
-                // The GET response names the parent UUID `transfer_id`; the webhook
-                // step DTO calls the same value `rebalance_id`. This is fed by the GET.
-                requireString(stepDto, "transfer_id"),
+                parentRebalanceId(stepDto),
                 requireString(stepDto, "unsigned_transaction"),
                 signWith,
                 network);
@@ -562,6 +560,23 @@ public final class Main {
             throw new IllegalStateException(onMissing);
         }
         return value.asText();
+    }
+
+    /**
+     * The parent rebalance id, which becomes the {@code {transferId}} path segment of the sign URL.
+     * The step's parent-id field is named after the resource that owns it: rebalance steps carry
+     * {@code rebalance_id} (payments {@code payment_id}, withdrawals {@code withdrawal_id}). Older
+     * API responses used {@code transfer_id} for all of them, so it is accepted as a fallback.
+     */
+    private static String parentRebalanceId(JsonNode stepDto) {
+        for (String field : new String[] {"rebalance_id", "transfer_id"}) {
+            JsonNode value = stepDto.path(field);
+            if (value.isTextual()) {
+                return value.asText();
+            }
+        }
+        throw new IllegalStateException(
+                "Missing required field `rebalance_id` (or legacy `transfer_id`) in: " + stepDto);
     }
 
     /** Pull a required string field directly out of a JSON object (no {@code data} envelope). */
