@@ -1,3 +1,5 @@
+import com.vanniktech.maven.publish.JavaLibrary
+import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.SonatypeHost
 import java.lang.module.ModuleDescriptor
 import java.lang.reflect.Modifier
@@ -278,6 +280,20 @@ val apiCheck by tasks.registering(ApiCheckTask::class) {
 tasks.named("check") { dependsOn(apiCheck) }
 
 mavenPublishing {
+    // JavadocJar.None, not the plugin's default of JavadocJar.Javadoc.
+    //
+    // The `java` block above calls withJavadocJar(), which adds Gradle's own
+    // `javadocJar` (classifier `javadoc`) to the java component -- and wires it
+    // into `assemble`, so `:sdk:build` in CI actually compiles the javadoc.
+    // The plugin's default would register a SECOND javadoc jar
+    // (`mavenPlainJavadocJar`) on the same publication. Two artifacts sharing an
+    // extension and classifier make the publication invalid, and
+    // `publishMavenPublicationToMavenCentralRepository` fails validation with
+    // "multiple artifacts with the identical extension and classifier". The
+    // sources jar does not collide because the plugin routes that through
+    // withSourcesJar(), which is idempotent.
+    configure(JavaLibrary(javadocJar = JavadocJar.None(), sourcesJar = true))
+
     publishToMavenCentral(SonatypeHost.CENTRAL_PORTAL)
     signAllPublications()
     coordinates(group.toString(), "sdk-java", version.toString())
