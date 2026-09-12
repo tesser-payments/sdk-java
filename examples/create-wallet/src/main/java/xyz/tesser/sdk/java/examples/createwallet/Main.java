@@ -23,8 +23,8 @@ import xyz.tesser.sdk.java.WalletType;
  * submits it to Tesser.
  *
  * <pre>
- * API_BASE_URL=https://staging.tesser.xyz \
- * AUTH_TOKEN_URL=https://auth.tesser.xyz/oauth/token \
+ * API_BASE_URL=https://sandbox.tesserx.co \
+ * AUTH_TOKEN_URL=https://dev-awqy75wdabpsnsvu.us.auth0.com/oauth/token \
  * API_CLIENT_ID=&lt;id&gt; API_CLIENT_SECRET=&lt;secret&gt; \
  * SIGNING_PUBLIC_KEY=&lt;hex&gt; SIGNING_PRIVATE_KEY=&lt;hex&gt; SIGNING_ENCLAVE_ID=&lt;org&gt; \
  * CREATE_WALLET_TYPE=stablecoin_ethereum \
