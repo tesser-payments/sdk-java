@@ -98,9 +98,9 @@ The SDK itself does **not** bundle a `.env` loader. `Main.java` uses plain
 ### Expected output
 
 ```text
-Fetching access token from https://auth.tesser.xyz/oauth/token (audience=https://staging.tesser.xyz) ...
+Fetching access token from https://dev-awqy75wdabpsnsvu.us.auth0.com/oauth/token (audience=https://sandbox.tesserx.co) ...
 Signing CreateWallet activity for type=STABLECOIN_ETHEREUM name=... ...
-Submitting to https://staging.tesser.xyz/v1/accounts/wallets ...
+Submitting to https://sandbox.tesserx.co/v1/accounts/wallets ...
 Wallet created. Response: {"wallet_id":"wal_...","address":"0x...", ...}
 ```
 
@@ -114,7 +114,7 @@ that `Wallet created.` printed and the response contains a `wallet_id`.
 | `Unable to locate a Java Runtime` / `Please visit http://www.java.com` | Java 17 not on PATH (macOS stub `/usr/bin/java` showing) | `brew install openjdk@17 && export PATH="/opt/homebrew/opt/openjdk@17/bin:$PATH"`. Add the export to `~/.zshrc` to persist. |
 | `Missing required environment variable: ...` | Step 3 didn't run, or `.env.local` is missing the listed variable | From the repo root (same working directory as Step 3), re-run `set -a && source examples/create-wallet/.env.local && set +a`; check the variable is uncommented. |
 | `OAuth token exchange failed: 401` | Bad `API_CLIENT_ID` or `API_CLIENT_SECRET` | Re-copy from the Tesser dashboard, Settings, then API Credentials. |
-| `OAuth token exchange failed: 404 ... "/oauth/token"` | `AUTH_TOKEN_URL` is set to the API base URL. Tesser hosts OAuth on a separate auth host. | Set `AUTH_TOKEN_URL` to your environment's auth endpoint (for example, `https://auth.tesser.xyz/oauth/token`); confirm the exact URL with Tesser support. |
+| `OAuth token exchange failed: 404 ... "/oauth/token"` | `AUTH_TOKEN_URL` is set to the API base URL. Tesser hosts OAuth on a separate auth host. | Set `AUTH_TOKEN_URL` to your environment's auth endpoint (for example, `https://dev-awqy75wdabpsnsvu.us.auth0.com/oauth/token`); confirm the exact URL with Tesser support. |
 | `OAuth token exchange failed: 403 ... "No audience parameter was provided"` | You've explicitly overridden `API_AUDIENCE` to an empty string. The example defaults audience to `API_BASE_URL`. | Unset `API_AUDIENCE` (or set it to `$API_BASE_URL`) and re-source `.env.local`. |
 | `OAuth response did not contain access_token` | Wrong `AUTH_TOKEN_URL` host or trailing slash | Verify the URL ends in `/oauth/token` exactly; check no trailing whitespace in `.env.local`. |
 | `POST .../v1/accounts/wallets failed: 401` | Token authenticated but wrong audience or scope | Coordinate with Tesser support; the token may need a specific scope. |

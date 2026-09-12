@@ -148,8 +148,9 @@ security report.
 
 ## Contributing
 
-Building, testing, lint, binary compatibility checks, and the release runbook
-live in [CONTRIBUTING.md](./CONTRIBUTING.md).
+Building, testing, lint, binary compatibility checks, and the release runbook —
+including the GitHub Actions secrets required to publish — live in
+[CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License
 

@@ -200,6 +200,31 @@ release blocks until cutting a release; the release runbook does that.
 Releases are manual. There is no push-triggered publish — merging to `main`
 never releases anything.
 
+### What GitHub needs before anything can deploy
+
+The release workflow reads exactly **four Actions secrets** — these are the only
+deployment credentials you configure on GitHub. Set them under
+**Settings → Secrets and variables → Actions** (repo or `tesser-payments` org
+level; both work):
+
+| Secret | What it is |
+|---|---|
+| `SONATYPE_CENTRAL_USERNAME` | Central Portal **user token** username (not the website password) |
+| `SONATYPE_CENTRAL_PASSWORD` | Password paired with that user token |
+| `GPG_PRIVATE_KEY_B64` | Base64 of the ASCII-armored GPG secret signing key |
+| `GPG_PASSPHRASE` | Passphrase of that GPG key |
+
+Beyond the secrets, two settings: Actions must be enabled, and **workflow
+permissions must be "Read and write"** (Settings → Actions → General) so the
+release job can push the version tag. Everything else (`GH_TOKEN`, the
+`ORG_GRADLE_PROJECT_*` variables Gradle expects) is derived inside the workflow —
+never configure those yourself.
+
+Where each secret value comes from, how to verify the setup, and the failure
+modes are covered step by step in
+[One-time setup](#one-time-setup-before-the-first-real-release) — the secrets
+specifically in [step 6](#6-repository-secrets).
+
 **Before the first release**, work through
 [One-time setup](#one-time-setup-before-the-first-real-release). The workflow is
 committed but inert until the repository is configured, and one of those steps —
