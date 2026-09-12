@@ -93,6 +93,7 @@ Note that `join()` wraps failures in `CompletionException`; unwrap with
 
 | Symptom | Diagnosis | Fix |
 |---|---|---|
+| `WARNING: step ... is \`confirmed\` ... but did not reach \`completed\` within PT5M` | The signed transaction was broadcast and mined (see `transaction_hash`). Tesser marks a step `completed` only once its block is finalized on the chain, and on Base Sepolia finality trails the head by roughly 15-20 minutes -- longer than the default wait. Signing and submission worked. | Nothing to fix. Re-run with `COMPLETION_WAIT_MINUTES=30` to wait for finality, or `GET /v1/treasury/rebalances/{id}` later. If the step is still `confirmed` well after its block finalized, report the rebalance id to Tesser. |
 | `Missing required environment variable: ...` | `set -a && source ...` did not run, or the variable is uncommented | Re-source `.env.local`. Confirm the variable has a value. |
 | `OAuth token exchange failed: 401` | Bad `API_CLIENT_ID` / `API_CLIENT_SECRET` | Re-copy from the Tesser dashboard. |
 | `POST .../v1/treasury/rebalances failed: 422` | Bad rebalance request (missing fields, currency mismatch, unsupported network, etc.) | Inspect the API error message. Confirm `from`/`to` fields match Tesser's account/currency expectations. |
