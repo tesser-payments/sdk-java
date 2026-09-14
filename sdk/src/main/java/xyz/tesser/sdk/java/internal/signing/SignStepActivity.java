@@ -38,7 +38,7 @@ public final class SignStepActivity {
             LongSupplier clock) {
         try {
             // Inside the try, so it fails the future rather than throwing at the
-            // call site — the contract LocalSigner documents and FutureSemanticsTest pins.
+            // call site: the contract LocalSigner documents and FutureSemanticsTest pins.
             Objects.requireNonNull(opts, "SignStepOptions must not be null");
             String turnkeyType = NetworkType.toTurnkeyType(step.network());
 

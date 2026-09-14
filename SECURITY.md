@@ -14,7 +14,7 @@ coordinate a fix and a CVE before anything is public.
 Please include, as far as you can:
 
 - the SDK version (`xyz.tesser:sdk-java:<version>`) and JDK version;
-- what an attacker gains — signature forgery, key disclosure, wrong-transaction
+- what an attacker gains: signature forgery, key disclosure, wrong-transaction
   signing, denial of service;
 - a reproduction, ideally a failing test against this repository.
 
@@ -34,7 +34,7 @@ version before reporting.
 | Version | Supported |
 | --- | --- |
 | latest release | yes |
-| anything older | no — upgrade first |
+| anything older | no, upgrade first |
 
 ## Scope
 
@@ -42,7 +42,7 @@ In scope, in roughly descending order of severity:
 
 - anything that causes a signature to be produced over bytes the caller did not
   intend, or with a key the caller did not intend;
-- private-key disclosure through the SDK's own surface — logging, `toString`,
+- private-key disclosure through the SDK's own surface: logging, `toString`,
   exception messages, serialization;
 - a divergence from the Kotlin SDK's wire format that would make a payload
   signed by this SDK be interpreted differently by the server;
@@ -71,5 +71,5 @@ not, and cannot:
   transport security and webhook verification are the caller's responsibility.
 - **validate transaction semantics.** It signs the `unsignedTransaction` it is
   given. Deciding that those bytes are the transaction you meant to send is the
-  caller's job — see the note in the webhooks example about never signing bytes
+  caller's job; see the note in the webhooks example about never signing bytes
   that arrived over an unauthenticated channel.

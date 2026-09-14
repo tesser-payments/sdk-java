@@ -13,8 +13,8 @@ import xyz.tesser.sdk.java.internal.util.Logging;
  * Produces locally-signed activity payloads for Tesser API operations.
  *
  * <p>Construction validates that all three {@link SigningConfig} fields are non-blank, that the
- * private key is a well-formed P-256 scalar, and that the public key is that scalar's public point
- * — a mismatched pair throws {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} here rather
+ * private key is a well-formed P-256 scalar, and that the public key is that scalar's public point.
+ * A mismatched pair throws {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} here rather
  * than becoming an opaque authentication rejection later. This is the only cryptographic work the
  * constructor does; it costs one scalar multiplication, once per signer.
  *
@@ -22,7 +22,7 @@ import xyz.tesser.sdk.java.internal.util.Logging;
  * freely.
  *
  * <p>Every signing method returns a {@link CompletableFuture} and never throws an <i>exception</i>
- * synchronously — failures arrive as a failed future. {@link Error} still propagates from the call
+ * synchronously; failures arrive as a failed future. {@link Error} still propagates from the call
  * site, since catching it to wrap in a future would do more harm than good. Today the work runs on
  * the calling thread; the future type exists so that adding external I/O (an MPC co-signer call in
  * the stamper) stays a non-breaking change.

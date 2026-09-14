@@ -49,9 +49,9 @@ public final class P256 {
     /**
      * Decodes a public key from hex.
      *
-     * <p>Accepts whatever encodings the curve does — compressed ({@code 02}/{@code 03}) and
-     * uncompressed ({@code 04}) — because the caller only needs the <i>point</i> to compare against
-     * a derived one. Rejecting an uncompressed key here would turn a comparison into an encoding
+     * <p>Accepts whatever encodings the curve does (compressed {@code 02}/{@code 03} and
+     * uncompressed {@code 04}), because the caller only needs the <i>point</i> to compare against a
+     * derived one. Rejecting an uncompressed key here would turn a comparison into an encoding
      * opinion, and the encoding opinion already lives in {@code SigningConfig}'s contract.
      *
      * @throws IllegalArgumentException if the hex is malformed or is not a point on the curve

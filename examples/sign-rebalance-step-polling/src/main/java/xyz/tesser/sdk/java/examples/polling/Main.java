@@ -18,9 +18,9 @@ import xyz.tesser.sdk.java.SigningConfig;
 import xyz.tesser.sdk.java.StepForSigning;
 
 /**
- * End-to-end harness for {@code LocalSigner.signStep} against the Tesser rebalance flow —
- * <b>polling variant</b>. Use this when webhook delivery is unreliable; the example simply polls
- * {@code GET /v1/treasury/rebalances/{id}} for state transitions.
+ * End-to-end harness for {@code LocalSigner.signStep} against the Tesser rebalance flow (<b>polling
+ * variant</b>). Use this when webhook delivery is unreliable; the example simply polls {@code GET
+ * /v1/treasury/rebalances/{id}} for state transitions.
  *
  * <p>Flow:
  *
@@ -48,11 +48,21 @@ import xyz.tesser.sdk.java.StepForSigning;
  * ./gradlew :examples:sign-rebalance-step-polling:run
  * </pre>
  *
- * <p>No tunnel, no webhook subscription, no public URL — everything is driven by the polling loop.
+ * <p>No tunnel, no webhook subscription, no public URL; everything is driven by the polling loop.
  */
 public final class Main {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    /**
+     * One shared client with a connect timeout. {@code HttpClient.newHttpClient()} per call builds
+     * a new connection pool each time, and neither the client nor {@link HttpRequest} times out by
+     * default, so a stalled connection would block a poll past the deadline that bounds it.
+     */
+    private static final HttpClient HTTP =
+            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     private static final Duration POLL_INTERVAL = Duration.ofSeconds(2);
 
@@ -485,12 +495,12 @@ public final class Main {
 
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(authTokenUrl))
+                        .timeout(REQUEST_TIMEOUT)
                         .header("Content-Type", "application/x-www-form-urlencoded")
                         .POST(HttpRequest.BodyPublishers.ofString(form))
                         .build();
 
-        HttpResponse<String> resp =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() < 200 || resp.statusCode() > 299) {
             throw new IllegalStateException(
                     "OAuth token exchange failed: " + resp.statusCode() + " " + resp.body());
@@ -509,12 +519,12 @@ public final class Main {
     private static String getJson(String url, String bearer) throws Exception {
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(url))
+                        .timeout(REQUEST_TIMEOUT)
                         .header("Authorization", "Bearer " + bearer)
                         .header("Accept", "application/json")
                         .GET()
                         .build();
-        HttpResponse<String> resp =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() < 200 || resp.statusCode() > 299) {
             throw new IllegalStateException(
                     "GET " + url + " failed: " + resp.statusCode() + " " + resp.body());
@@ -525,12 +535,12 @@ public final class Main {
     private static String postJson(String url, String bearer, String body) throws Exception {
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(url))
+                        .timeout(REQUEST_TIMEOUT)
                         .header("Authorization", "Bearer " + bearer)
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(body))
                         .build();
-        HttpResponse<String> resp =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() < 200 || resp.statusCode() > 299) {
             throw new IllegalStateException(
                     "POST " + url + " failed: " + resp.statusCode() + " " + resp.body());

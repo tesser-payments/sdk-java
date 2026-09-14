@@ -3,7 +3,7 @@
  *
  * <p>Only the two packages below are exported. {@code xyz.tesser.sdk.java.internal.*} is {@code
  * public} in the Java-language sense purely because {@link xyz.tesser.sdk.java.LocalSigner} lives
- * in a different package and Java has no {@code internal} keyword — those types are not API, they
+ * in a different package and Java has no {@code internal} keyword; those types are not API, they
  * are excluded from the {@code apiCheck} lockfile, and this descriptor is what actually makes them
  * unreachable from a consumer's module rather than merely undocumented.
  *

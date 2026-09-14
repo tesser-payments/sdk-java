@@ -41,7 +41,7 @@ public final class KeyPairCheck {
         } catch (RuntimeException e) {
             // Also does not echo the value. A field named publicKey normally
             // holds public data, but everything that reaches here is by
-            // definition *not* a public key — it failed to decode as a point.
+            // definition *not* a public key: it failed to decode as a point.
             // A misdirected env var or a key pasted into the wrong slot lands
             // here holding something else, quite possibly another private
             // scalar, and this code cannot tell which. Cheaper to never print it
@@ -56,7 +56,7 @@ public final class KeyPairCheck {
 
         if (!P256.publicPoint(scalar).equals(configured)) {
             // Safe to echo here, unlike above: reaching this line means the value
-            // decoded as a point on the curve, and a private scalar cannot — it is
+            // decoded as a point on the curve, and a private scalar cannot: it is
             // 32 bytes, while an encoded point is 33 or 65. So this is genuinely a
             // public key, just the wrong one, and naming it is the whole diagnostic.
             //

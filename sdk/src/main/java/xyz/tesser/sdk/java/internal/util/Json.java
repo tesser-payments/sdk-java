@@ -13,11 +13,11 @@ import xyz.tesser.sdk.java.error.TesserError;
  * The single JSON writer for the SDK.
  *
  * <p>Only writing is needed: the SDK never deserializes anything. Output must be byte-identical to
- * kotlinx.serialization's, because the signature is base64 of this exact text — see
+ * kotlinx.serialization's, because the signature is base64 of this exact text; see
  * JsonEscapingParityTest.
  *
  * <p>ObjectNode preserves insertion order (it is LinkedHashMap-backed), and Jackson writes compact
- * by default, which together match {@code buildJsonObject { … }.toString()}.
+ * by default, which together match {@code buildJsonObject { ... }.toString()}.
  */
 public final class Json {
 
@@ -26,7 +26,7 @@ public final class Json {
      *
      * <p>An exposed {@code ObjectMapper} is mutable: any consumer calling {@code
      * MAPPER.configure(...)} would silently change escaping for every signature produced in the
-     * process — the exact failure this SDK's test suite exists to prevent, and one no test can
+     * process: the exact failure this SDK's test suite exists to prevent, and one no test can
      * catch, because the mutation happens in consumer code. Keeping it private makes that
      * unreachable rather than merely discouraged.
      */
@@ -49,7 +49,7 @@ public final class Json {
      *
      * <p>Only the C0 range needs handling: the five characters with short escapes ({@code \\b \\t
      * \\n \\f \\r}) already agree, everything from U+0020 up is written raw by both writers
-     * (including DEL, U+2028 and U+2029), and {@code "} and {@code \\} agree. U+0000–U+0009 have no
+     * (including DEL, U+2028 and U+2029), and {@code "} and {@code \\} agree. U+0000-U+0009 have no
      * letter digits, so they are unaffected either way; they are included rather than special-cased
      * because "escape the whole range uniformly" is easier to verify than a hand-pruned list.
      */
@@ -104,7 +104,7 @@ public final class Json {
     }
 
     /**
-     * Parses {@code json}. Used only by tests and fixtures — the SDK itself never deserializes
+     * Parses {@code json}. Used only by tests and fixtures; the SDK itself never deserializes
      * anything.
      */
     public static JsonNode readTree(String json) {

@@ -3,7 +3,7 @@ package xyz.tesser.sdk.java.internal.util;
 /**
  * ASCII-only hex codec for key material and signature bytes.
  *
- * <p>Internal. Extracted so the stamper and the key-pair check parse hex the same way — a private
+ * <p>Internal. Extracted so the stamper and the key-pair check parse hex the same way; a private
  * key that one accepts and the other rejects would be worse than either behaviour alone.
  */
 public final class Hex {
@@ -47,7 +47,7 @@ public final class Hex {
      * for U+0665 (Arabic-Indic five) and 10 for U+FF21 (fullwidth A). The Kotlin SDK validates with
      * {@code it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F'}, so it rejects those. Using
      * Character.digit here would make the Java SDK silently accept a key the Kotlin SDK refuses and
-     * sign with a different scalar than the caller intended — precisely the wrong-signature failure
+     * sign with a different scalar than the caller intended: precisely the wrong-signature failure
      * this SDK is built to avoid.
      */
     private static int digit(char c) {
