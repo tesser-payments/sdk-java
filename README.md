@@ -10,7 +10,7 @@ Tesser API. Targets Java 17+.
 
 ```kotlin
 dependencies {
-    implementation("xyz.tesser:sdk-java:0.0.1")
+    implementation("xyz.tesser:sdk-java:0.0.2")
 }
 ```
 
@@ -20,7 +20,7 @@ dependencies {
 <dependency>
     <groupId>xyz.tesser</groupId>
     <artifactId>sdk-java</artifactId>
-    <version>0.0.1</version>
+    <version>0.0.2</version>
 </dependency>
 ```
 
@@ -50,13 +50,14 @@ public class Example {
 }
 ```
 
-For runnable end-to-end scripts, see [`examples/create-wallet`](./examples/create-wallet)
+For runnable end-to-end scripts, see [`examples/create-wallet`](./examples#create-wallet)
 (wallet creation), [`examples/sign-rebalance-step-webhooks`](./examples/sign-rebalance-step-webhooks)
 (rebalance step signing driven by Tesser webhooks), and
 [`examples/sign-rebalance-step-polling`](./examples/sign-rebalance-step-polling)
-(same flow, polling-based — use this while webhook delivery is unreliable).
-Each example's README walks through env setup, the runtime sequence, and
-troubleshooting.
+(same flow over polling; use this while webhook delivery is unreliable).
+Env setup, the runtime sequence, and troubleshooting are covered per example:
+`create-wallet` in the [examples README](./examples/README.md), the two
+rebalance flows in their own READMEs.
 
 ## What's included
 
@@ -96,10 +97,10 @@ Two things are worth knowing before you construct a `SigningConfig`:
   itself. Treat any component holding a `SigningConfig` as holding key material.
 
 ECDSA nonces are RFC 6979 deterministic, so signing the same body with the same
-key twice produces the same signature. This is invisible on the wire — a
+key twice produces the same signature. This is invisible on the wire: a
 verifier checks `(r, s)` against the public key and cannot tell how `k` was
-derived — and it removes the failure mode where a weak or misseeded
-`SecureRandom` would leak the private scalar.
+derived. Deterministic nonces remove the failure mode where a weak or
+misseeded `SecureRandom` would leak the private scalar.
 
 ## Future semantics
 
@@ -112,11 +113,11 @@ knowing, and all three are pinned by tests so they cannot regress:
   stamper) is not a breaking change. If that happens, an `Executor` overload
   will appear alongside the current methods.
 - **Failures arrive as a failed future, not a synchronous throw.** This holds
-  for *exceptions*. `Error` and its subclasses — a `NoClassDefFoundError` from a
-  missing Bouncy Castle, an `OutOfMemoryError` — still propagate from the call
+  for *exceptions*. `Error` and its subclasses (a `NoClassDefFoundError` from a
+  missing Bouncy Castle, an `OutOfMemoryError`) still propagate from the call
   site, because catching them to stuff into a future would do more harm than
   good. The one deliberate exception is `LocalSigner`'s constructor, which
-  validates eagerly — `IllegalArgumentException` for a blank field,
+  validates eagerly: `IllegalArgumentException` for a blank field,
   `TesserError.ConfigError` for a malformed or mismatched key pair. Construction
   is not a future-returning operation, and a configuration error is worth
   finding once at startup rather than on every call.
@@ -148,8 +149,8 @@ security report.
 
 ## Contributing
 
-Building, testing, lint, binary compatibility checks, and the release runbook —
-including the GitHub Actions secrets required to publish — live in
+Building, testing, lint, binary compatibility checks, and the release runbook,
+including the GitHub Actions secrets required to publish, live in
 [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## License

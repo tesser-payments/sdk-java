@@ -106,7 +106,7 @@ class LocalSignerTest {
     @Test
     void constructorErrorForAnUnparseablePublicKeyDoesNotEchoTheKey() {
         // Anything reaching the publicKey branch failed to decode as a curve
-        // point, so it is not a public key — a misdirected env var can land
+        // point, so it is not a public key; a misdirected env var can land
         // another private scalar here, and the message must not carry it into a
         // log. A 32-byte scalar never decodes (a point is 33 or 65 bytes).
         String strayScalar = "c9afa9d845ba75166b5c215767b1d6934e50c3db36e89b127b8a622b120f6721";

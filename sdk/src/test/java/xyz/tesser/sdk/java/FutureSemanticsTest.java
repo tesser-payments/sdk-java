@@ -38,8 +38,8 @@ class FutureSemanticsTest {
 
     @Test
     void stamperFailureFailsTheFutureRatherThanThrowingSynchronously() {
-        // A malformed private key can no longer reach this path — LocalSigner's
-        // constructor rejects it — so the stamper failure is injected directly.
+        // A malformed private key can no longer reach this path (LocalSigner's
+        // constructor rejects it), so the stamper failure is injected directly.
         // This is the case that matters once the stamper does real I/O.
         Stamp exploding = mock(Stamp.class);
         when(exploding.stamp(any(), any()))

@@ -13,7 +13,7 @@ instead of webhooks:
 
 > **Status:** this example is **compile-verified only**. It builds and fails
 > with the expected message when environment variables are absent, but the full
-> round trip has not been exercised — that needs Tesser staging credentials.
+> round trip has not been exercised; that needs Tesser staging credentials.
 >
 > Use this variant while Tesser webhook delivery is unreliable; it does not
 > require a tunnel, public URL, or webhook subscription. The webhook variant
@@ -80,11 +80,11 @@ Relative to the Kotlin original:
 
 | Kotlin | Java |
 |---|---|
-| `delay(2.seconds)` | `Thread.sleep(...)` — this is a plain blocking program with no coroutine scope |
+| `delay(2.seconds)` | `Thread.sleep(...)`; this is a plain blocking program with no coroutine scope |
 | `withTimeout(2.minutes) { … }` | a deadline computed once with `System.nanoTime()`, checked before each sleep |
 | `kotlinx.serialization` `JsonObject` | Jackson `JsonNode` |
 | `runBlocking { signer.signStep(step) }` | `signer.signStep(step).join()` |
-| `jsonPrimitive.contentOrNull` | `node.path(field).asText(null)` — returns null for both a missing field and an explicit JSON `null`, which is what the `failed_at` check depends on |
+| `jsonPrimitive.contentOrNull` | `node.path(field).asText(null)`; returns null for both a missing field and an explicit JSON `null`, which is what the `failed_at` check depends on |
 
 Note that `join()` wraps failures in `CompletionException`; unwrap with
 `getCause()` to reach the underlying `TesserError`.

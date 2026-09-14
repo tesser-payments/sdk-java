@@ -56,7 +56,7 @@ class ApiKeyStampTest {
         // P-256 DER ECDSA: SEQUENCE header (2) + two INTEGERs of 1-33 value bytes
         // plus 2 header bytes each. r and s can encode short when their leading
         // bytes are zero, so this stays a range rather than an exact length even
-        // though k is now deterministic — the range is a property of DER, not of
+        // though k is now deterministic; the range is a property of DER, not of
         // the nonce. The Kotlin test's floor of 138 is widened to 136 because both
         // r and s encoding at 31 bytes is reachable.
         assertThat(sigHex.length()).isBetween(136, 144);

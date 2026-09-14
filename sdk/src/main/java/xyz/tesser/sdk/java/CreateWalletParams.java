@@ -16,7 +16,7 @@ public record CreateWalletParams(String name, WalletType type) {
      *
      * <p>Kotlin data-class constructors emit {@code Intrinsics.checkNotNullParameter}, which throws
      * {@link NullPointerException} for a null argument (Kotlin 1.4+ switched parameter null-checks
-     * from IAE to NPE — verified against {@code sdk-0.0.4.jar}, which reports "Parameter specified
+     * from IAE to NPE; verified against {@code sdk-0.0.4.jar}, which reports "Parameter specified
      * as non-null is null"). A bare record would instead accept null and serialize {@code
      * "walletName":null}, producing a well-formed body that gets signed and then rejected upstream.
      * {@code requireNonNull} reproduces both the behaviour and the exception type.

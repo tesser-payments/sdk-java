@@ -35,8 +35,8 @@ import xyz.tesser.sdk.java.internal.util.Json;
  * all use Bouncy Castle; only the JSON envelope and base64url wrap are written here.
  *
  * <p>Nonces are RFC 6979 deterministic, so stamping the same body with the same key twice yields
- * the same signature. That is a Java-SDK-only property — the Kotlin SDK and the vendor's WebCrypto
- * implementation use random k — and it is invisible on the wire: a verifier checks {@code (r, s)}
+ * the same signature. That is a Java-SDK-only property (the Kotlin SDK and the vendor's WebCrypto
+ * implementation use random k), and it is invisible on the wire: a verifier checks {@code (r, s)}
  * against the public key and cannot tell how k was derived.
  */
 final class ApiKeyStamp implements Stamp {

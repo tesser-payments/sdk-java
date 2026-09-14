@@ -26,7 +26,7 @@ import xyz.tesser.sdk.java.internal.util.Json;
 class GoldenBodyParityTest {
 
     // Only organizationId reaches the body, so the key pair is irrelevant to the
-    // comparison — but LocalSigner now derives and checks it, so it has to be real.
+    // comparison, but LocalSigner now derives and checks it, so it has to be real.
     private static final SigningConfig CFG = TestKeys.config("org_fixture");
 
     /** The generator's timestamps were normalised; match that here. */

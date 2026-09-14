@@ -53,7 +53,7 @@ You should see `BUILD SUCCESSFUL` with all tests passing.
 ```
 
 Use the `:sdk`-scoped form. A bare `./gradlew build` also builds `:fixtures`,
-which resolves `xyz.tesser:sdk:0.0.4` from your local Maven repository — so on a
+which resolves `xyz.tesser:sdk:0.0.4` from your local Maven repository, so on a
 fresh clone it fails with an unresolved-dependency error that has nothing to do
 with your change. Publish the Kotlin SDK locally first if you genuinely want a
 full root build.
@@ -83,7 +83,7 @@ Spotless, which is a race, not a formatting problem.
 ```
 
 CI additionally compiles the three example modules. `:fixtures` is deliberately
-excluded from CI — it needs the Kotlin SDK in `mavenLocal`, which CI has no
+excluded from CI: it needs the Kotlin SDK in `mavenLocal`, which CI has no
 reason to build, and its output is committed.
 
 ### Conventions
@@ -94,7 +94,7 @@ reason to build, and its output is committed.
   kotlinx.serialization's, and `Json` carries the `CharacterEscapes` that makes
   that true. Its `ObjectMapper` is private precisely so it cannot be
   reconfigured out from under the parity tests.
-- **Wire-format constants are copied verbatim** from the Kotlin SDK —
+- **Wire-format constants are copied verbatim** from the Kotlin SDK:
   `ACTIVITY_TYPE_*`, `CURVE_*`, `TRANSACTION_TYPE_*`, derivation paths, wallet
   wire values. Never "improve" one; parity is the point.
 - **No emojis in committed files.** Plain ASCII in source. Section signs (`§`)
@@ -118,7 +118,7 @@ cd ~/code/sdk-java   && ./gradlew :fixtures:run
 ```
 
 Commit the regenerated files under `sdk/src/test/resources/fixtures/`. CI does
-not run `:fixtures` — it has no reason to build the Kotlin SDK.
+not run `:fixtures`; it has no reason to build the Kotlin SDK.
 
 The fixtures are pinned to the Kotlin SDK at `df0986e` (tag `v0.0.4`). If
 `~/code/sdk-kotlin` HEAD moves off that tag, the generator silently starts
@@ -148,8 +148,8 @@ belongs in the same gate. `module-info.class` itself is skipped by the class wal
 rendered from `ModuleDescriptor.read` instead.
 
 The stanza covers `requires` (with modifiers), `exports`, `opens`, and
-`provides`. Qualified directives render their targets — `exports foo to bar`, not
-just `exports foo` — because narrowing an unqualified export to a qualified one
+`provides`. Qualified directives render their targets (`exports foo to bar`, not
+just `exports foo`) because narrowing an unqualified export to a qualified one
 breaks every consumer except the named module, and the two would otherwise be
 indistinguishable. `uses` is deliberately excluded: it declares what this module
 consumes, which is an implementation detail rather than part of the contract
@@ -162,9 +162,9 @@ undocumented.
 
 sdk-kotlin uses the Kotlin
 [`binary-compatibility-validator`](https://github.com/Kotlin/binary-compatibility-validator)
-for this. That plugin only registers its tasks for Kotlin compilations —
-applied to a `java-library` project it contributes nothing at all — so the
-lockfile here is produced by a small `apiDump`/`apiCheck` pair defined in
+for this. That plugin only registers its tasks for Kotlin compilations; applied
+to a `java-library` project it contributes nothing at all, so the lockfile here
+is produced by a small `apiDump`/`apiCheck` pair defined in
 `sdk/build.gradle.kts`. The model is the same; only the implementation differs.
 
 **CI runs `apiCheck` on every PR.** A diff against the committed lockfile fails
@@ -197,12 +197,12 @@ release blocks until cutting a release; the release runbook does that.
 
 ## Releasing
 
-Releases are manual. There is no push-triggered publish — merging to `main`
+Releases are manual. There is no push-triggered publish: merging to `main`
 never releases anything.
 
 ### What GitHub needs before anything can deploy
 
-The release workflow reads exactly **four Actions secrets** — these are the only
+The release workflow reads exactly **four Actions secrets**; these are the only
 deployment credentials you configure on GitHub. Set them under
 **Settings → Secrets and variables → Actions** (repo or `tesser-payments` org
 level; both work):
@@ -217,18 +217,18 @@ level; both work):
 Beyond the secrets, two settings: Actions must be enabled, and **workflow
 permissions must be "Read and write"** (Settings → Actions → General) so the
 release job can push the version tag. Everything else (`GH_TOKEN`, the
-`ORG_GRADLE_PROJECT_*` variables Gradle expects) is derived inside the workflow —
+`ORG_GRADLE_PROJECT_*` variables Gradle expects) is derived inside the workflow;
 never configure those yourself.
 
 Where each secret value comes from, how to verify the setup, and the failure
 modes are covered step by step in
-[One-time setup](#one-time-setup-before-the-first-real-release) — the secrets
+[One-time setup](#one-time-setup-before-the-first-real-release), the secrets
 specifically in [step 6](#6-repository-secrets).
 
 **Before the first release**, work through
 [One-time setup](#one-time-setup-before-the-first-real-release). The workflow is
-committed but inert until the repository is configured, and one of those steps —
-granting the workflow write access — fails *after* the artifact is already
+committed but inert until the repository is configured, and one of those steps
+(granting the workflow write access) fails *after* the artifact is already
 permanently published if it is missed.
 
 Every release after that:
@@ -246,7 +246,7 @@ Every release after that:
    to the version from step 1. This publishes to the Central Portal, pushes the
    `v<version>` tag, and creates the GitHub release.
 
-`publishAndReleaseToMavenCentral` both uploads and releases the deployment —
+`publishAndReleaseToMavenCentral` both uploads and releases the deployment;
 there is no separate "close/release" click in the Portal UI. Artifacts usually
 appear on Maven Central within about 30 minutes.
 
@@ -259,7 +259,7 @@ version.
 
 The Kotlin SDK releases on push to `main`: its gate publishes whenever the
 version in `gradle.properties` has no matching tag, and `workflow_dispatch` is
-an always-dry-run. This repo inverts that — there is no `push` trigger at all,
+an always-dry-run. This repo inverts that: there is no `push` trigger at all,
 and dispatch is the release path. Both repos still share the whole publishing
 *mechanism* (the vanniktech configuration, the gate, GPG handling, artifact
 layout); only the trigger differs.
@@ -289,7 +289,7 @@ place. Work through them in order; each one is independently verifiable.
 The dry run at the end is **partial coverage**, not a full rehearsal. It runs the
 verify build, GPG signing, and publication to Maven Local. It does *not* run the
 real-release validation step (branch, `confirm_version`, tag absence), the upload
-to the Central Portal, the tag push, or the GitHub release — all four are gated on
+to the Central Portal, the tag push, or the GitHub release; all four are gated on
 `dry_run == false`. So a green dry run proves the build and signing work; it
 cannot tell you whether steps 2 and 3 below are configured correctly.
 
@@ -318,15 +318,15 @@ branch (`gh repo view --json defaultBranchRef`).
 
 **Settings → Actions → General.**
 
-- **Actions permissions** — Actions must be enabled. On an org-owned repo this
+- **Actions permissions**: Actions must be enabled. On an org-owned repo this
   can also be restricted at the org level; if the Actions tab is missing
   entirely, that is where to look.
-- **Workflow permissions** — set to **"Read and write permissions"**.
+- **Workflow permissions**: set to **"Read and write permissions"**.
 
 The second one is the step most likely to be missed, and it fails at the worst
 possible moment. The release job pushes the `v<version>` tag and calls
 `gh release create`; both need `contents: write`. `release.yml` declares
-`permissions: contents: write` at workflow level, but that declaration interacts
+`permissions: contents: write` on the publish job, but that declaration interacts
 with the repository default, and GitHub's own documentation is not explicit about
 which wins: it says only that a restricted default "will apply to the relevant
 repositories" and that org owners "can restrict write access for the
@@ -334,14 +334,14 @@ repositories" and that org owners "can restrict write access for the
 
 Rather than depend on resolving that, set the default to write. If the repository
 default does cap the workflow declaration, a release with it left on read-only
-uploads to Maven Central successfully and *then* `403`s on the tag push — after
+uploads to Maven Central successfully and *then* `403`s on the tag push, after
 the version is already permanent and cannot be re-published. Setting it to write
 costs nothing and removes the question entirely.
 
 Note that a dry run cannot reassure you here: it never reaches the tagging step.
 If you want certainty before a real release, trigger a dry run and read the
 `GITHUB_TOKEN Permissions` block that Actions prints in the job's "Set up job"
-log — that shows the effective permissions the token was actually granted.
+log; that shows the effective permissions the token was actually granted.
 
 Check and fix from the CLI:
 
@@ -360,7 +360,7 @@ gh api -X PUT repos/tesser-payments/sdk-java/actions/permissions/workflow \
 
 If you later protect `main` or add rulesets, note that the release job pushes a
 tag rather than a branch. Branch protection on `main` does not affect it, but a
-**tag ruleset** matching `refs/tags/v*` will — a "restrict creations" rule blocks
+**tag ruleset** matching `refs/tags/v*` will: a "restrict creations" rule blocks
 the push unless `github-actions[bot]` is in the bypass list.
 
 There are no rulesets on this repo today, so nothing to do unless you add some:
@@ -397,12 +397,12 @@ as an authentication error partway through the upload.
 | Secret | What it is | Where to get it |
 |---|---|---|
 | `SONATYPE_CENTRAL_USERNAME` | Central Portal **user token** username | <https://central.sonatype.com> → Sign in → Account → *Generate User Token*. This is the Portal token, **not** the website password and not legacy OSSRH credentials. |
-| `SONATYPE_CENTRAL_PASSWORD` | Password paired to that token | Generated together with the username; copy both at once — the portal shows the password only once. |
+| `SONATYPE_CENTRAL_PASSWORD` | Password paired to that token | Generated together with the username; copy both at once; the portal shows the password only once. |
 | `GPG_PRIVATE_KEY_B64` | Base64 of the ASCII-armored secret signing key | `gpg --export-secret-keys --armor <key-id> \| base64`. On Linux use `base64 -w0` (single line); macOS `base64` is single-line already. Base64 exists so the multi-line PEM survives GitHub's secret pipeline without CRLF/whitespace mangling that breaks Bouncy Castle's PGP parser. |
 | `GPG_PASSPHRASE` | Passphrase of that GPG key | Whatever the key was created with. |
 
 If another `xyz.tesser` artifact already publishes with the same Sonatype account
-and GPG key, reuse those values — but recover them from wherever they were
+and GPG key, reuse those values, but recover them from wherever they were
 originally stored (password manager / keychain), since GitHub does not let you
 read a secret back after saving.
 
@@ -420,7 +420,7 @@ no change because `secrets.X` resolves org secrets transparently. Two caveats:
 
 Verify they landed (values are never readable, only names). Repository secrets
 and organization secrets are separate endpoints, and the first does **not** show
-the second — so if you took the org-secret route, the repo-scoped command
+the second, so if you took the org-secret route, the repo-scoped command
 returning nothing is expected, not a problem:
 
 ```bash
@@ -429,12 +429,12 @@ gh api repos/tesser-payments/sdk-java/actions/organization-secrets -q '.secrets[
 ```
 
 The second lists exactly the org secrets *this repository* can see, which is the
-thing that actually matters — it already accounts for the visibility setting
+thing that actually matters, since it already accounts for the visibility setting
 above. Between them the four names must all appear.
 
 Nothing else needs configuring. `GH_TOKEN` uses the built-in `github.token`, and
 the `ORG_GRADLE_PROJECT_*` variables Gradle expects are constructed inside the
-workflow from the secrets above — you never add those to GitHub yourself.
+workflow from the secrets above; you never add those to GitHub yourself.
 
 #### Setup checklist
 
@@ -446,15 +446,15 @@ workflow from the secrets above — you never add those to GitHub yourself.
 | 4 | Sonatype user token generated | Portal → Account |
 | 5 | GPG key published to a keyserver | `gpg --keyserver keys.openpgp.org --recv-keys <key-id>` from a clean machine |
 | 6 | Four secrets present | `gh api repos/OWNER/REPO/actions/secrets` |
-| 7 | Dry run green with a `.asc` per artifact (partial coverage — see above) | See below |
+| 7 | Dry run green with a `.asc` per artifact (partial coverage; see above) | See below |
 
 ### Verifying with a dry run
 
-Once steps 1–6 are done, run the workflow with `dry_run` checked. Expected:
+Once steps 1-6 are done, run the workflow with `dry_run` checked. Expected:
 
 - `gate` reads the version and **skips** the validation step (dry runs are exempt).
 - `publish` runs the full verify build, then `:sdk:publishToMavenLocal`, then
-  lists artifacts under `~/.m2/repository/xyz/tesser/sdk-java` — jar, sources
+  lists artifacts under `~/.m2/repository/xyz/tesser/sdk-java`: jar, sources
   jar, javadoc jar, POM, module file, and a `.asc` signature for each.
 - **No tag, no GitHub release, nothing reaches the Central Portal.**
 
@@ -478,7 +478,7 @@ Failure modes worth recognising:
 | Symptom | Recovery |
 |---|---|
 | The verify build fails (test / spotless / apiCheck) | Nothing was published. Fix on `main` and re-run the workflow. |
-| Publish succeeded but tagging failed | See below — the artifact is permanent, so the tag must point at the commit that produced it. |
+| Publish succeeded but tagging failed | See below: the artifact is permanent, so the tag must point at the commit that produced it. |
 | Workflow seems hung | Check the Actions log. The Sonatype Central Portal API is occasionally slow during high traffic; uploads can stall but typically recover within roughly 10 minutes. |
 | The Central Portal shows a staged-but-not-released bundle | Check the bundle status in the Portal UI; a stuck staging bundle can usually be dropped there. |
 
@@ -502,6 +502,6 @@ git push origin "vX.Y.Z"
 gh release create "vX.Y.Z" --generate-notes       # the workflow's other missing step
 ```
 
-Then fix the cause before the next release — usually workflow permissions
+Then fix the cause before the next release, usually workflow permissions
 (setup step 2) or a tag ruleset (setup step 3). **Do not re-run the publish:** the
 version cannot be overwritten, and the run would fail at the Portal anyway.

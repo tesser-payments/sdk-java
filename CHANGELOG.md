@@ -5,7 +5,7 @@
 ### Added
 
 - Initial release. `LocalSigner.signCreateWallet` and `LocalSigner.signStep`,
-  at parity with the Kotlin SDK's 0.0.4 wire output — verified byte-for-byte by
+  at parity with the Kotlin SDK's 0.0.4 wire output, verified byte-for-byte by
   `GoldenBodyParityTest` against fixtures generated from the Kotlin SDK.
 - Sealed `TesserError` hierarchy with `ConfigError`, `APIError`,
   `ConnectionError`, `TimeoutError` and `SigningError`.
@@ -39,8 +39,8 @@ body, so `GoldenBodyParityTest` is unaffected.
   is now also rejected at construction rather than on the first `sign*` call;
   the "signing methods never throw synchronously" contract is unchanged.
 - **`SigningConfig.toString()` masks `privateKey`.** The record-generated
-  version printed the raw private scalar, so any incidental stringification — a
-  framework properties dump, an exception carrying the config — leaked the key.
+  version printed the raw private scalar, so any incidental stringification (a
+  framework properties dump, an exception carrying the config) leaked the key.
   `equals`/`hashCode` are unchanged.
 - `signStep(step, null)` now fails the returned future instead of being silently
   accepted.
@@ -48,7 +48,7 @@ body, so `GoldenBodyParityTest` is unaffected.
 ### Removed
 
 - `internal.util.Redact`. It had no callers, its Javadoc claimed a use that did
-  not exist, and its pattern did not match `privateKey` — the one key it would
+  not exist, and its pattern did not match `privateKey`, the one key it would
   most plausibly have been pointed at.
 
 ### Fixed
@@ -65,9 +65,19 @@ body, so `GoldenBodyParityTest` is unaffected.
 - All three examples parse the OAuth `access_token` with Jackson rather than a
   regex, and `create-wallet` builds its request body with `ObjectMapper` rather
   than string concatenation.
+- The README install snippets referenced `0.0.1`, which was never published;
+  they now match `gradle.properties`. The `create-wallet` link now lands on the
+  walkthrough in `examples/README.md` instead of a bare directory listing.
+- All three examples share one `HttpClient` with a connect timeout and apply a
+  per-request timeout, replacing a fresh client per call with no timeout at
+  all, where a stalled connection would hang the run past its own deadlines.
 
 ### Security
 
 - The Gradle distribution is pinned by SHA-256 in `gradle-wrapper.properties`.
 - `release.yml` passes `workflow_dispatch` inputs to the shell through `env:`
   rather than `${{ }}` interpolation.
+- `ci.yml` now declares `permissions: contents: read` instead of inheriting the
+  repository default token permissions, and `release.yml` scopes
+  `contents: write` to the publish job that actually pushes the tag; the gate
+  job runs read-only.

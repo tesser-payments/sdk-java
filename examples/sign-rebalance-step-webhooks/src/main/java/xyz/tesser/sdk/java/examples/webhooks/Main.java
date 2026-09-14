@@ -54,8 +54,8 @@ import xyz.tesser.sdk.java.StepForSigning;
  *
  * <h2>Why the webhook payload is never signed</h2>
  *
- * <p>Webhook signature verification is intentionally not implemented yet — the verification
- * algorithm is not documented in the public Tesser docs at the time of writing — so every POST that
+ * <p>Webhook signature verification is intentionally not implemented yet (the verification
+ * algorithm is not documented in the public Tesser docs at the time of writing), so every POST that
  * reaches this listener is untrusted, and the listener is reachable by anyone who finds the tunnel
  * URL. The event is therefore used only as a <i>trigger</i>: it tells the example when to look, and
  * which rebalance and step to look for, and its {@code rebalance_id} is checked against the id
@@ -69,6 +69,16 @@ import xyz.tesser.sdk.java.StepForSigning;
 public final class Main {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    /**
+     * One shared client with a connect timeout. {@code HttpClient.newHttpClient()} per call builds
+     * a new connection pool each time, and neither the client nor {@link HttpRequest} times out by
+     * default, so a stalled connection would block a step read past the deadline that bounds it.
+     */
+    private static final HttpClient HTTP =
+            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     /** Largest webhook body accepted. A step event is a few hundred bytes. */
     private static final int MAX_BODY_BYTES = 64 * 1024;
@@ -136,7 +146,7 @@ public final class Main {
                     });
             // Same rule as for signing: the event says when to look, the API says
             // what is true. Printing "complete" straight off the webhook would let
-            // a forged event report a success that never happened — and a single
+            // a forged event report a success that never happened, and a single
             // unchecked GET would do the same thing whenever the read lags the
             // event, so this waits for the API to actually report `completed`.
             printCompletedStep(
@@ -235,7 +245,7 @@ public final class Main {
             // Register at "/" so any incoming path works (whcli, ngrok, and
             // similar tunnels typically forward to the bare target URL with no
             // extra path component). HttpServer routes by longest-prefix
-            // match — without other contexts, every request lands here.
+            // match; without other contexts, every request lands here.
             server.createContext("/", exchange -> handle(exchange, events));
             server.start();
             System.out.println(
@@ -335,7 +345,7 @@ public final class Main {
                     return envelope;
                 }
                 System.out.println(
-                        "  (skipping webhook event — "
+                        "  (skipping webhook event: "
                                 + label
                                 + " not satisfied; type="
                                 + envelope.path("type").asText(null)
@@ -349,8 +359,8 @@ public final class Main {
          * Reads at most {@code max} bytes of the request body, or returns null if the body is
          * larger.
          *
-         * <p>{@code Content-Length} is not trusted as the limit — it is attacker-controlled and may
-         * be absent under chunked encoding — so the read itself is capped and one extra byte is
+         * <p>{@code Content-Length} is not trusted as the limit (it is attacker-controlled and may
+         * be absent under chunked encoding), so the read itself is capped and one extra byte is
          * probed to tell "exactly max" from "over max".
          */
         private static byte[] readBounded(HttpExchange exchange, int max) throws IOException {
@@ -413,7 +423,7 @@ public final class Main {
      * <p>Nothing that ends up inside the signature originates from the webhook body. Taking {@code
      * unsigned_transaction} straight off the POST would mean this program signs whatever bytes an
      * unauthenticated caller put there, with the enclave key, and then submits the result to the
-     * real API — the transaction is the one thing that must not come from an untrusted source.
+     * real API. The transaction is the one thing that must not come from an untrusted source.
      */
     private static StepForSigning fetchStepForSigning(
             ExampleConfig config, String token, String rebalanceId, String stepId)
@@ -619,12 +629,12 @@ public final class Main {
 
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(authTokenUrl))
+                        .timeout(REQUEST_TIMEOUT)
                         .header("Content-Type", "application/x-www-form-urlencoded")
                         .POST(HttpRequest.BodyPublishers.ofString(form))
                         .build();
 
-        HttpResponse<String> resp =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() < 200 || resp.statusCode() > 299) {
             throw new IllegalStateException(
                     "OAuth token exchange failed: " + resp.statusCode() + " " + resp.body());
@@ -643,12 +653,12 @@ public final class Main {
     private static String getJson(String url, String bearer) throws Exception {
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(url))
+                        .timeout(REQUEST_TIMEOUT)
                         .header("Authorization", "Bearer " + bearer)
                         .header("Accept", "application/json")
                         .GET()
                         .build();
-        HttpResponse<String> resp =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() < 200 || resp.statusCode() > 299) {
             throw new IllegalStateException(
                     "GET " + url + " failed: " + resp.statusCode() + " " + resp.body());
@@ -659,12 +669,12 @@ public final class Main {
     private static String postJson(String url, String bearer, String body) throws Exception {
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(url))
+                        .timeout(REQUEST_TIMEOUT)
                         .header("Authorization", "Bearer " + bearer)
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(body))
                         .build();
-        HttpResponse<String> resp =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() < 200 || resp.statusCode() > 299) {
             throw new IllegalStateException(
                     "POST " + url + " failed: " + resp.statusCode() + " " + resp.body());

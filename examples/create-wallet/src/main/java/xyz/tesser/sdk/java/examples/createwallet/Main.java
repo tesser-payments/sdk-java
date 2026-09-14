@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import xyz.tesser.sdk.java.CreateWalletParams;
 import xyz.tesser.sdk.java.LocalSigner;
 import xyz.tesser.sdk.java.SignedResult;
@@ -38,6 +39,16 @@ import xyz.tesser.sdk.java.WalletType;
 public final class Main {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+
+    /**
+     * One shared client with a connect timeout. {@code HttpClient.newHttpClient()} per call builds
+     * a new connection pool each time, and neither the client nor {@link HttpRequest} times out by
+     * default, so a stalled connection would hang the run indefinitely.
+     */
+    private static final HttpClient HTTP =
+            HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+
+    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(30);
 
     private Main() {}
 
@@ -109,12 +120,12 @@ public final class Main {
 
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(authTokenUrl))
+                        .timeout(REQUEST_TIMEOUT)
                         .header("Content-Type", "application/x-www-form-urlencoded")
                         .POST(HttpRequest.BodyPublishers.ofString(form))
                         .build();
 
-        HttpResponse<String> resp =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() < 200 || resp.statusCode() > 299) {
             throw new IllegalStateException(
                     "OAuth token exchange failed: " + resp.statusCode() + " " + resp.body());
@@ -135,13 +146,13 @@ public final class Main {
     private static String postJson(String url, String bearer, String body) throws Exception {
         HttpRequest request =
                 HttpRequest.newBuilder(URI.create(url))
+                        .timeout(REQUEST_TIMEOUT)
                         .header("Authorization", "Bearer " + bearer)
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString(body))
                         .build();
 
-        HttpResponse<String> resp =
-                HttpClient.newHttpClient().send(request, HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> resp = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
         if (resp.statusCode() < 200 || resp.statusCode() > 299) {
             throw new IllegalStateException(
                     "POST " + url + " failed: " + resp.statusCode() + " " + resp.body());

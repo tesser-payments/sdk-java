@@ -3,7 +3,7 @@ package xyz.tesser.sdk.java;
 /**
  * A real, matching P-256 key pair for tests.
  *
- * <p>The private scalar is 1, so the public point is the curve generator G — a published constant
+ * <p>The private scalar is 1, so the public point is the curve generator G, a published constant
  * from FIPS 186-4, not a secret anyone could mistake for one. It has to be a genuine pair because
  * {@code LocalSigner}'s constructor derives the public point and rejects a mismatch; an arbitrary
  * placeholder like {@code "02".repeat(33)} no longer constructs.

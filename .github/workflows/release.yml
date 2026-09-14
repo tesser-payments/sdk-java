@@ -19,7 +19,7 @@ name: Release
 # Every reference below is `inputs.dry_run`, never `github.event.inputs.dry_run`.
 # For a typed boolean input the former is a real boolean, so `== false` behaves;
 # the latter is the STRING "false", which is truthy and would make
-# `if: ${{ github.event.inputs.dry_run == false }}` never fire — silently turning
+# `if: ${{ github.event.inputs.dry_run == false }}` never fire, silently turning
 # every dry run into a real publish. Do not "simplify" these expressions.
 on:
   workflow_dispatch:
@@ -33,13 +33,14 @@ on:
         type: string
         required: false
 
-# `contents: write` is needed so the publish job can push the version tag.
-permissions:
-  contents: write
-
+# Token permissions are scoped per job, not at workflow level: `gate` only
+# reads the checkout, so it runs read-only. `contents: write` lives on the
+# publish job, which pushes the version tag and creates the GitHub release.
 jobs:
   gate:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.read.outputs.version }}
     steps:
@@ -93,6 +94,8 @@ jobs:
   publish:
     needs: gate
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -141,7 +144,7 @@ jobs:
         # SonatypeRepositoryBuildService injects `BuildFeatures` at execution
         # time, which Gradle's configuration cache refuses to serialize
         # (UnknownServiceException). The rest of the build keeps the cache on
-        # via gradle.properties — only the publish step opts out.
+        # via gradle.properties; only the publish step opts out.
         run: |
           if [ -z "$GPG_PRIVATE_KEY_B64" ]; then
             echo "::error::GPG_PRIVATE_KEY_B64 secret is empty or unset" >&2

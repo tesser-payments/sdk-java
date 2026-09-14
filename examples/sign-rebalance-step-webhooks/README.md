@@ -15,7 +15,7 @@ End-to-end harness that exercises the full Tesser rebalance flow:
 
 > **Status:** this example is **compile-verified only**. It builds and fails
 > with the expected message when environment variables are absent, but the full
-> round trip has not been exercised — that needs Tesser staging credentials and
+> round trip has not been exercised; that needs Tesser staging credentials and
 > a publicly reachable callback URL.
 >
 > Separately, webhook delivery from Tesser staging is currently **unreliable**.
@@ -33,13 +33,13 @@ untrusted**. The example uses webhook events only as a *trigger*:
 
 - The `step.signature_requested` event must carry the `rebalance_id` returned by
   this run's `createRebalance`, so a forged or left-over event is skipped.
-- The bytes that get signed — `unsigned_transaction` — always come back from an
+- The bytes that get signed (`unsigned_transaction`) always come back from an
   authenticated `GET`, never from the POST body. Signing the payload directly
   would let an unauthenticated caller choose the transaction this program signs
   with the enclave key and submits to the real API.
 - The final "complete" line is likewise re-read from the API rather than printed
   off the event, and the read is retried until the API itself reports
-  `status=completed` — an unchecked single read would happily print a stale
+  `status=completed`; an unchecked single read would still print a stale
   status with `completed_at=null` and exit successfully.
 
 Request bodies are capped at 64 KiB (`413` beyond that) and the event queue holds
@@ -105,7 +105,7 @@ Submitting signature: POST https://sandbox.tesserx.co/v1/treasury/rebalances/reb
 Step submitted. API response: {...}
 Waiting for step step_... to reach `status=completed` ...
   webhook received: path=/ type=step.submitted id=evt_...
-  (skipping webhook event — step step_... status=completed not satisfied; type=step.submitted id=evt_...)
+  (skipping webhook event: step step_... status=completed not satisfied; type=step.submitted id=evt_...)
   webhook received: path=/ type=step.completed id=evt_...
 Rebalance complete. step.id=step_... status=completed completed_at=...
 ```
@@ -120,12 +120,12 @@ in the following places:
 
 | Kotlin | Java |
 |---|---|
-| `Channel<JsonObject>(capacity = Channel.UNLIMITED)` | `LinkedBlockingQueue<JsonNode>` bounded to 256 — the Kotlin channel is fed by a private listener, this one by the public internet |
-| `withTimeout(t) { events.receive() }` | `queue.poll(remaining, NANOSECONDS)` against a deadline computed once, with an explicit null-on-timeout branch — `poll` reports a timeout by returning null rather than throwing |
+| `Channel<JsonObject>(capacity = Channel.UNLIMITED)` | `LinkedBlockingQueue<JsonNode>` bounded to 256; the Kotlin channel is fed by a private listener, this one by the public internet |
+| `withTimeout(t) { events.receive() }` | `queue.poll(remaining, NANOSECONDS)` against a deadline computed once, with an explicit null-on-timeout branch; `poll` reports a timeout by returning null rather than throwing |
 | `kotlinx.serialization` `JsonObject` | Jackson `JsonNode` |
 | `runBlocking { signer.signStep(step) }` | `signer.signStep(step).join()` |
 
-`com.sun.net.httpserver.HttpServer` is **not** a substitution — the Kotlin
+`com.sun.net.httpserver.HttpServer` is **not** a substitution: the Kotlin
 example already uses that exact JDK class, so the server code ports verbatim.
 
 Note that `join()` wraps failures in `CompletionException`; unwrap with
@@ -142,7 +142,7 @@ Note that `join()` wraps failures in `CompletionException`; unwrap with
 | Webhook arrives but is skipped | The event doesn't satisfy the predicate being awaited | The skip line prints the event `type` and `id`. The harness only acts on a `step.signature_requested` whose `rebalance_id` matches this run, then on a step event with `status=completed`. A `signature_requested` left over from an earlier run is skipped by design. |
 | `Missing required field \`unsigned_transaction\` in: ...` | The step DTO field names changed on the server side | File an issue with the captured `GET /v1/treasury/rebalances/{id}` response. The expected step fields are `id`, `rebalance_id` (older responses: `transfer_id`), `unsigned_transaction`. |
 | `Timed out after PT30S waiting for step ... to carry an \`unsigned_transaction\`` | The webhook beat the read-your-writes window by more than 30s, or the step never got a transaction | Re-run. If it repeats, use the polling example and capture the rebalance GET responses. |
-| `Timed out after PT30S waiting for step ... to report \`status=completed\`` | The `completed` event arrived but the authenticated GET never agreed within 30s | The step is probably fine — the example refuses to print success it cannot confirm. Check the rebalance in the dashboard, or re-read it with `GET /v1/treasury/rebalances/{id}`. |
+| `Timed out after PT30S waiting for step ... to report \`status=completed\`` | The `completed` event arrived but the authenticated GET never agreed within 30s | The step is probably fine; the example refuses to print success it cannot confirm. Check the rebalance in the dashboard, or re-read it with `GET /v1/treasury/rebalances/{id}`. |
 | `POST .../sign failed: 422 ... bad signature` | Stamp wire format does not match what the server expects | Capture the unsigned transaction bytes and the produced signature; file an issue with both. The current implementation stamps the unsigned transaction hex string verbatim using the X-Stamp envelope. |
 | `POST .../sign failed: 409 ... step already signed / expired` | Either a previous run already submitted, or the rebalance timed out | Create a fresh rebalance and try again. |
 | `Address already in use` on startup | Something else holds `WEBHOOK_PORT` | Change `WEBHOOK_PORT`, or stop the other process. |
