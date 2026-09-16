@@ -10,7 +10,7 @@ spotless = "8.10.2"
 maven-publish = "0.30.0"
 binary-compat = "0.18.2"
 # Only the fixtures module needs Kotlin; it is never published.
-kotlin = "2.4.10"
+kotlin = "2.4.20"
 
 [libraries]
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
