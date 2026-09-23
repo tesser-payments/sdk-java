@@ -1,5 +1,5 @@
 [versions]
-jackson = "2.18.2"
+jackson = "2.22.2"
 slf4j = "2.0.19"
 bouncycastle = "1.86"
 junit = "6.1.3"
