@@ -10,12 +10,24 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      # Test-only churn is noise; batch it into one PR.
-      test-dependencies:
-        patterns:
-          - "org.junit*"
-          - "org.assertj:*"
-          - "org.mockito:*"
+      # Routine minor/patch churn is batched into one weekly PR; the parity
+      # gate and API lockfile in CI are what actually vouch for it. Majors
+      # still arrive as individual PRs.
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+        exclude-patterns:
+          # The crypto core of the SDK: keep its bumps as dedicated PRs so a
+          # Bouncy Castle change is always an intentional, visible review.
+          - "org.bouncycastle:*"
+    ignore:
+      # Newer versions drop the SonatypeHost API our publish config uses (PR
+      # #16 failed CI on exactly this, at 0.37.0); upgrading is
+      # a deliberate Central Portal migration, not a version bump. Remove this
+      # rule when that migration is scheduled.
+      - dependency-name: "com.vanniktech.maven.publish"
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -25,3 +37,10 @@ updates:
     # that form and rewrites the SHA while keeping the `# vX.Y.Z` comment, so
     # pinning does not have to be traded away to get updates.
     open-pull-requests-limit: 5
+    groups:
+      # Same batching rationale as gradle: one weekly PR for routine bumps.
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
