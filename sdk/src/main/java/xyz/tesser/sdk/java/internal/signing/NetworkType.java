@@ -22,7 +22,8 @@ public final class NetworkType {
                     "ETHEREUM_SEPOLIA", "TRANSACTION_TYPE_ETHEREUM",
                     "POLYGON", "TRANSACTION_TYPE_ETHEREUM",
                     "POLYGON_AMOY", "TRANSACTION_TYPE_ETHEREUM",
-                    "SOLANA", "TRANSACTION_TYPE_SOLANA");
+                    "SOLANA", "TRANSACTION_TYPE_SOLANA",
+                    "TEMPO", "TRANSACTION_TYPE_ETHEREUM");
 
     private NetworkType() {}
 
