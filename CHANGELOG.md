@@ -4,6 +4,8 @@
 
 ### Added
 
+- `TEMPO` in the supported step-signing network list, mapped to
+  `TRANSACTION_TYPE_ETHEREUM` like the other EVM-family networks.
 - Initial release. `LocalSigner.signCreateWallet` and `LocalSigner.signStep`,
   at parity with the Kotlin SDK's 0.0.4 wire output, verified byte-for-byte by
   `GoldenBodyParityTest` against fixtures generated from the Kotlin SDK.

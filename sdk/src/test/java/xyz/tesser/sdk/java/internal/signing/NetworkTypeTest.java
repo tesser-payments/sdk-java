@@ -18,7 +18,8 @@ class NetworkTypeTest {
         "ETHEREUM_SEPOLIA, TRANSACTION_TYPE_ETHEREUM",
         "POLYGON,          TRANSACTION_TYPE_ETHEREUM",
         "POLYGON_AMOY,     TRANSACTION_TYPE_ETHEREUM",
-        "SOLANA,           TRANSACTION_TYPE_SOLANA"
+        "SOLANA,           TRANSACTION_TYPE_SOLANA",
+        "TEMPO,            TRANSACTION_TYPE_ETHEREUM"
     })
     void mapsEverySupportedNetwork(String network, String expected) {
         assertThat(NetworkType.toTurnkeyType(network)).isEqualTo(expected);
@@ -31,7 +32,7 @@ class NetworkTypeTest {
                 .hasMessageContaining("MARS_TESTNET")
                 .hasMessageContaining(
                         "BASE, BASE_SEPOLIA, ETHEREUM, ETHEREUM_SEPOLIA, POLYGON, POLYGON_AMOY,"
-                                + " SOLANA");
+                                + " SOLANA, TEMPO");
     }
 
     @Test
