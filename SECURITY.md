@@ -69,7 +69,7 @@ not, and cannot:
   should be treated as holding key material.
 - **authenticate anything.** It holds no API credentials, and its only HTTP
   call is fetching the Ethereum wallet-creation request from the `apiBaseUrl`
-  you configure; transport security and webhook verification are the caller's
+  you configure, or, without one, from production and then sandbox; transport security and webhook verification are the caller's
   responsibility.
 - **validate transaction semantics.** It authorizes the `unsignedTransaction`
   it is given with your API key, without changing it. Deciding that those

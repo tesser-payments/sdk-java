@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
@@ -196,6 +197,61 @@ class LocalSignerTest {
     @Test
     void constructorAcceptsPlainHttpForALoopbackHost() {
         assertThat(new LocalSigner(CFG, "http://localhost:3001/v1")).isNotNull();
+    }
+
+    @Test
+    void preZeroOneQuickStartConstructorStillWorks() {
+        LocalSigner signer = new LocalSigner(CFG);
+
+        assertThat(signer.signing()).isEqualTo(CFG);
+    }
+
+    @Test
+    void constructorWithAnHttpClientAndNoApiBaseUrlIsAccepted() {
+        assertThat(new LocalSigner(CFG, StubHttpClient.unused()).signing()).isEqualTo(CFG);
+    }
+
+    @Test
+    void constructorWithoutApiBaseUrlStillRejectsABlankPublicKey() {
+        assertThatThrownBy(() -> new LocalSigner(new SigningConfig("", "priv", "org")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("publicKey");
+    }
+
+    @Test
+    void constructorWithoutApiBaseUrlStillRejectsAMismatchedKeyPair() {
+        String otherKey = "03" + "7cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc47669978";
+        assertThatThrownBy(
+                        () ->
+                                new LocalSigner(
+                                        new SigningConfig(otherKey, TestKeys.PRIVATE_KEY, "org")))
+                .isInstanceOf(TesserError.ConfigError.class)
+                .hasMessageContaining("is not the public key for");
+    }
+
+    @Test
+    void constructorChecksABlankFieldBeforeTheApiBaseUrl() {
+        assertThatThrownBy(() -> new LocalSigner(new SigningConfig("", "priv", "org"), "not a url"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("publicKey");
+    }
+
+    @Test
+    void constructorChecksTheKeyPairBeforeTheApiBaseUrl() {
+        String otherKey = "03" + "7cf27b188d034f7e8a52380304b51ac3c08969e277f21b35a60b48fc47669978";
+        assertThatThrownBy(
+                        () ->
+                                new LocalSigner(
+                                        new SigningConfig(otherKey, TestKeys.PRIVATE_KEY, "org"),
+                                        "not a url"))
+                .isInstanceOf(TesserError.ConfigError.class)
+                .hasMessageContaining("is not the public key for");
+    }
+
+    @Test
+    void constructorWithoutApiBaseUrlRejectsANullHttpClient() {
+        assertThatThrownBy(() -> new LocalSigner(CFG, (HttpClient) null))
+                .isInstanceOf(NullPointerException.class);
     }
 
     @Test

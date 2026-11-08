@@ -34,12 +34,10 @@ import xyz.tesser.sdk.java.*;
 
 public class Example {
     public static void main(String[] args) {
-        LocalSigner signer = new LocalSigner(
-            new SigningConfig(
-                System.getenv("SIGNING_PUBLIC_KEY"),
-                System.getenv("SIGNING_PRIVATE_KEY"),
-                System.getenv("SIGNING_ENCLAVE_ID")),
-            "https://api.tesser.xyz"); // sandbox: https://api-sandbox.tesser.xyz
+        LocalSigner signer = new LocalSigner(new SigningConfig(
+            System.getenv("SIGNING_PUBLIC_KEY"),
+            System.getenv("SIGNING_PRIVATE_KEY"),
+            System.getenv("SIGNING_ENCLAVE_ID")));
 
         CompletableFuture<SignedResult> future = signer.signCreateWallet(
             new CreateWalletParams("My wallet", WalletType.STABLECOIN_ETHEREUM));
@@ -63,9 +61,16 @@ rebalance flows in their own READMEs.
 
 ## What's included
 
-- `new LocalSigner(signing, apiBaseUrl)` requires the Tesser API base URL
-  (`https://api.tesser.xyz` or `https://api-sandbox.tesser.xyz`). An optional
-  `java.net.http.HttpClient` can be passed to configure a proxy.
+- `new LocalSigner(signing)` works with production and sandbox signing keys.
+  Without `apiBaseUrl`, the first Ethereum `signCreateWallet` tries production
+  and, if production does not accept your signing key, sandbox, and remembers
+  it for later calls. Set `apiBaseUrl` (`new LocalSigner(signing, apiBaseUrl)`)
+  if your network allows only one Tesser host, or if you create a new signer
+  per request (each new signer detects again). When set, only this URL is
+  used: `https://api.tesser.xyz` in production,
+  `https://api-sandbox.tesser.xyz` in sandbox. Send your own API requests to
+  the environment of your signing key. An optional `java.net.http.HttpClient`
+  can be passed to configure a proxy.
 - `LocalSigner.signCreateWallet(...)` signs a wallet-creation request. For
   `STABLECOIN_ETHEREUM`, it first fetches the request to sign from the Tesser
   API and checks that it matches your parameters. The private key never leaves
@@ -79,12 +84,14 @@ rebalance flows in their own READMEs.
   `STABLECOIN_STELLAR`. Tesser currently supports managed wallets for
   `STABLECOIN_ETHEREUM` only.
 - Sealed `TesserError` hierarchy. The signer reports `ConfigError` for bad
-  input (a mismatched key pair, an invalid `apiBaseUrl`, an unknown wallet
-  type) and `SigningError` for any signing failure or a fetched request that
+  input (a mismatched key pair, an invalid `apiBaseUrl`, if set, an unknown
+  wallet type) and `SigningError` for any signing failure or a fetched request that
   does not match your parameters. Fetching the request can fail with
   `APIError`, `ConnectionError`, or `TimeoutError`. `ConnectionError`,
   `TimeoutError`, and an `APIError` with status 429 or 5xx are safe to retry;
   an `APIError` with any other 4xx status fails the same way on retry.
+  Without `apiBaseUrl`, if neither environment accepts your signing key, the
+  `APIError` from production is thrown.
 - A JPMS module descriptor. The published jar is the named module
   `xyz.tesser.sdk.java` and exports only `xyz.tesser.sdk.java` and
   `xyz.tesser.sdk.java.error`; `xyz.tesser.sdk.java.internal.*` is `public` only
@@ -130,11 +137,12 @@ knowing, and all three are pinned by tests so they cannot regress:
   good. The one deliberate exception is `LocalSigner`'s constructor, which
   validates eagerly: `IllegalArgumentException` for a blank field,
   `TesserError.ConfigError` for a malformed or mismatched key pair or an
-  invalid `apiBaseUrl`. Construction
+  invalid `apiBaseUrl`, if set. Construction
   is not a future-returning operation, and a configuration error is worth
   finding once at startup rather than on every call.
-- **`LocalSigner` is thread-safe and reentrant.** It holds no mutable state, so
-  a single instance can be shared freely.
+- **`LocalSigner` is thread-safe and reentrant.** The only state is the
+  environment remembered after the first Ethereum wallet request; a single
+  `LocalSigner` may be shared across concurrent calls.
 
 ### Unwrapping errors
 

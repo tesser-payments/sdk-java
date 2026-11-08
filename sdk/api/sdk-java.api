@@ -23,8 +23,10 @@ public final class xyz.tesser.sdk.java.LocalSigner {
     public java.util.concurrent.CompletableFuture<xyz.tesser.sdk.java.SignedResult> xyz.tesser.sdk.java.LocalSigner.signCreateWallet(xyz.tesser.sdk.java.CreateWalletParams)
     public java.util.concurrent.CompletableFuture<xyz.tesser.sdk.java.SignedStepResult> xyz.tesser.sdk.java.LocalSigner.signStep(xyz.tesser.sdk.java.StepForSigning)
     public java.util.concurrent.CompletableFuture<xyz.tesser.sdk.java.SignedStepResult> xyz.tesser.sdk.java.LocalSigner.signStep(xyz.tesser.sdk.java.StepForSigning,xyz.tesser.sdk.java.SignStepOptions)
+    public xyz.tesser.sdk.java.LocalSigner(xyz.tesser.sdk.java.SigningConfig)
     public xyz.tesser.sdk.java.LocalSigner(xyz.tesser.sdk.java.SigningConfig,java.lang.String)
     public xyz.tesser.sdk.java.LocalSigner(xyz.tesser.sdk.java.SigningConfig,java.lang.String,java.net.http.HttpClient)
+    public xyz.tesser.sdk.java.LocalSigner(xyz.tesser.sdk.java.SigningConfig,java.net.http.HttpClient)
     public xyz.tesser.sdk.java.SigningConfig xyz.tesser.sdk.java.LocalSigner.signing()
 }
 

@@ -3,6 +3,7 @@ package xyz.tesser.sdk.java;
 import java.net.http.HttpClient;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import xyz.tesser.sdk.java.internal.signing.CreateWalletActivity;
 import xyz.tesser.sdk.java.internal.signing.KeyPairCheck;
@@ -16,13 +17,17 @@ import xyz.tesser.sdk.java.internal.util.Logging;
  *
  * <p>Construction validates that all three {@link SigningConfig} fields are non-blank, that the
  * private key is a well-formed P-256 scalar, that the public key is that scalar's public point, and
- * that {@code apiBaseUrl} is an https URL. A mismatched pair or an invalid {@code apiBaseUrl}
- * throws {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} here rather than becoming an
- * opaque rejection later. The key check is the only cryptographic work the constructor does; it
- * costs one scalar multiplication, once per signer.
+ * that {@code apiBaseUrl}, if set, is an https URL. A mismatched pair or an invalid {@code
+ * apiBaseUrl} throws {@link xyz.tesser.sdk.java.error.TesserError.ConfigError} here rather than
+ * becoming an opaque rejection later. The key check is the only cryptographic work the constructor
+ * does; it costs one scalar multiplication, once per signer.
  *
- * <p><b>Thread-safe and reentrant.</b> Holds no mutable state; a single instance may be shared
- * freely.
+ * <p>Without {@code apiBaseUrl}, the signer finds the environment your signing key belongs to,
+ * production or sandbox, on the first {@link WalletType#STABLECOIN_ETHEREUM} wallet request and
+ * remembers it for later calls.
+ *
+ * <p><b>Thread-safe and reentrant.</b> The only state is the environment remembered after the first
+ * Ethereum wallet request; a single LocalSigner may be shared across concurrent calls.
  *
  * <p>Every signing method returns a {@link CompletableFuture} and never throws an <i>exception</i>
  * synchronously; failures arrive as a failed future. {@link Error} still propagates from the call
@@ -45,12 +50,39 @@ public final class LocalSigner {
     private final TesserApiConnection api;
 
     /**
+     * Creates a signer that uses a default {@link HttpClient} for requests to Tesser and finds the
+     * environment your signing key belongs to, production or sandbox.
+     *
+     * @param signing API-key configuration (public key, private key, enclave ID)
+     */
+    public LocalSigner(SigningConfig signing) {
+        this(signing, TesserApiConnection.createDefaultHttpClient());
+    }
+
+    /**
+     * Creates a signer that uses {@code httpClient} for requests to Tesser and finds the
+     * environment your signing key belongs to, production or sandbox.
+     *
+     * @param signing API-key configuration (public key, private key, enclave ID)
+     * @param httpClient HTTP client used for requests to Tesser. Pass one to configure a proxy or
+     *     TLS settings.
+     */
+    public LocalSigner(SigningConfig signing, HttpClient httpClient) {
+        this(
+                signing,
+                () -> TesserApiConnection.detectingEnvironment(httpClient),
+                Stamp.create(),
+                System::currentTimeMillis);
+    }
+
+    /**
      * Creates a signer that uses a default {@link HttpClient} for requests to Tesser.
      *
      * @param signing API-key configuration (public key, private key, enclave ID)
-     * @param apiBaseUrl Tesser API base URL: {@code https://api.tesser.xyz} in production, {@code
-     *     https://api-sandbox.tesser.xyz} in sandbox. A trailing {@code /} or {@code /v1} is
-     *     removed.
+     * @param apiBaseUrl Tesser API base URL. Only this URL is used: {@code https://api.tesser.xyz}
+     *     in production, {@code https://api-sandbox.tesser.xyz} in sandbox. A trailing {@code /} or
+     *     {@code /v1} is removed. Use {@link #LocalSigner(SigningConfig)} to let the signer find
+     *     the environment your signing key belongs to.
      */
     public LocalSigner(SigningConfig signing, String apiBaseUrl) {
         this(signing, apiBaseUrl, TesserApiConnection.createDefaultHttpClient());
@@ -60,9 +92,10 @@ public final class LocalSigner {
      * Creates a signer that uses {@code httpClient} for requests to Tesser.
      *
      * @param signing API-key configuration (public key, private key, enclave ID)
-     * @param apiBaseUrl Tesser API base URL: {@code https://api.tesser.xyz} in production, {@code
-     *     https://api-sandbox.tesser.xyz} in sandbox. A trailing {@code /} or {@code /v1} is
-     *     removed.
+     * @param apiBaseUrl Tesser API base URL. Only this URL is used: {@code https://api.tesser.xyz}
+     *     in production, {@code https://api-sandbox.tesser.xyz} in sandbox. A trailing {@code /} or
+     *     {@code /v1} is removed. Use {@link #LocalSigner(SigningConfig, HttpClient)} to let the
+     *     signer find the environment your signing key belongs to.
      * @param httpClient HTTP client used for requests to Tesser. Pass one to configure a proxy or
      *     TLS settings.
      */
@@ -82,11 +115,23 @@ public final class LocalSigner {
             HttpClient httpClient,
             Stamp stamp,
             LongSupplier clock) {
+        this(signing, () -> TesserApiConnection.create(apiBaseUrl, httpClient), stamp, clock);
+    }
+
+    LocalSigner(SigningConfig signing, TesserApiConnection api, Stamp stamp, LongSupplier clock) {
+        this(signing, () -> api, stamp, clock);
+    }
+
+    private LocalSigner(
+            SigningConfig signing,
+            Supplier<TesserApiConnection> openApiConnection,
+            Stamp stamp,
+            LongSupplier clock) {
         requireNonBlank(signing.publicKey(), "SigningConfig.publicKey must not be blank");
         requireNonBlank(signing.privateKey(), "SigningConfig.privateKey must not be blank");
         requireNonBlank(signing.enclaveId(), "SigningConfig.enclaveId must not be blank");
         KeyPairCheck.verify(signing);
-        this.api = TesserApiConnection.create(apiBaseUrl, httpClient);
+        this.api = openApiConnection.get();
         this.signing = signing;
         this.stamp = stamp;
         this.clock = clock;
@@ -105,6 +150,10 @@ public final class LocalSigner {
      * the Tesser API and checks that it matches {@code params}. Other wallet types are signed
      * locally without a request to Tesser.
      *
+     * <p>Without {@code apiBaseUrl}, the first Ethereum request tries production and, if production
+     * does not accept your signing key, sandbox, and the signer remembers the environment that
+     * accepted it for later calls.
+     *
      * <p>The returned {@link SignedResult#signature()} is the exact value to pass into Tesser's
      * wallet-creation request body. The private key never leaves the JVM.
      *
@@ -117,7 +166,8 @@ public final class LocalSigner {
      *       request fetched from Tesser does not match {@code params}; nothing is signed;
      *   <li>{@link xyz.tesser.sdk.java.error.TesserError.APIError} if Tesser answers with a non-2xx
      *       status. Safe to retry for status 429 or 5xx; other 4xx statuses fail the same way on
-     *       retry;
+     *       retry. Without {@code apiBaseUrl}, if neither production nor sandbox accepts your
+     *       signing key, the error from production;
      *   <li>{@link xyz.tesser.sdk.java.error.TesserError.ConnectionError} if the request to Tesser
      *       fails at the transport level. Safe to retry;
      *   <li>{@link xyz.tesser.sdk.java.error.TesserError.TimeoutError} if the request to Tesser
