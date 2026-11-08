@@ -67,9 +67,11 @@ not, and cannot:
   possibly interned, and present in heap dumps for as long as the config is
   reachable. `toString()` masks it, but any component holding a `SigningConfig`
   should be treated as holding key material.
-- **authenticate anything.** It performs no HTTP and holds no API credentials;
-  transport security and webhook verification are the caller's responsibility.
-- **validate transaction semantics.** It signs the `unsignedTransaction` it is
-  given. Deciding that those bytes are the transaction you meant to send is the
-  caller's job; see the note in the webhooks example about never signing bytes
+- **authenticate anything.** It holds no API credentials, and its only HTTP
+  call is fetching the Ethereum wallet-creation request from the `apiBaseUrl`
+  you configure; transport security and webhook verification are the caller's
+  responsibility.
+- **validate transaction semantics.** It authorizes the `unsignedTransaction`
+  it is given with your API key, without changing it. Deciding that those
+  bytes are the transaction you meant to send is the caller's job; see the note in the webhooks example about never signing bytes
   that arrived over an unauthenticated channel.

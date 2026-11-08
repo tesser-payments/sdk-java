@@ -16,6 +16,7 @@ import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.TestFactory;
 import xyz.tesser.sdk.java.internal.signing.Stamp;
 import xyz.tesser.sdk.java.internal.signing.StampResult;
+import xyz.tesser.sdk.java.internal.signing.StubHttpClient;
 import xyz.tesser.sdk.java.internal.util.Json;
 
 /**
@@ -31,6 +32,8 @@ class GoldenBodyParityTest {
 
     /** The generator's timestamps were normalised; match that here. */
     private static final long FIXED_TS = 1_234_567_890_123L;
+
+    private static final String API_BASE_URL = "https://api.tesser.xyz";
 
     private static Stamp stubStamp() {
         Stamp stamp = mock(Stamp.class);
@@ -56,20 +59,9 @@ class GoldenBodyParityTest {
         JsonNode wallets = fixtures().get("wallets");
         Map<String, CreateWalletParams> cases =
                 Map.of(
-                        "eth-plain",
-                                new CreateWalletParams("wallet", WalletType.STABLECOIN_ETHEREUM),
                         "sol-plain", new CreateWalletParams("wallet", WalletType.STABLECOIN_SOLANA),
                         "xlm-plain",
-                                new CreateWalletParams("wallet", WalletType.STABLECOIN_STELLAR),
-                        "eth-quotes",
-                                new CreateWalletParams(
-                                        "a \"quoted\" name", WalletType.STABLECOIN_ETHEREUM),
-                        "eth-emoji",
-                                new CreateWalletParams("wallet 💸", WalletType.STABLECOIN_ETHEREUM),
-                        "eth-newline",
-                                new CreateWalletParams(
-                                        "line1\nline2", WalletType.STABLECOIN_ETHEREUM),
-                        "eth-empty", new CreateWalletParams("", WalletType.STABLECOIN_ETHEREUM));
+                                new CreateWalletParams("wallet", WalletType.STABLECOIN_STELLAR));
 
         List<DynamicTest> tests = new ArrayList<>();
         for (Map.Entry<String, CreateWalletParams> e : cases.entrySet()) {
@@ -79,7 +71,12 @@ class GoldenBodyParityTest {
                             "createWallet/" + e.getKey(),
                             () -> {
                                 LocalSigner signer =
-                                        new LocalSigner(CFG, stubStamp(), () -> FIXED_TS);
+                                        new LocalSigner(
+                                                CFG,
+                                                API_BASE_URL,
+                                                StubHttpClient.unused(),
+                                                stubStamp(),
+                                                () -> FIXED_TS);
                                 String actual =
                                         normalise(
                                                 signer.signCreateWallet(e.getValue())
@@ -89,7 +86,7 @@ class GoldenBodyParityTest {
                                 assertThat(actual).isEqualTo(expected);
                             }));
         }
-        assertThat(tests).hasSize(7);
+        assertThat(tests).hasSize(2);
         return tests;
     }
 
@@ -114,7 +111,12 @@ class GoldenBodyParityTest {
                             "signStep/" + net,
                             () -> {
                                 LocalSigner signer =
-                                        new LocalSigner(CFG, stubStamp(), () -> FIXED_TS);
+                                        new LocalSigner(
+                                                CFG,
+                                                API_BASE_URL,
+                                                StubHttpClient.unused(),
+                                                stubStamp(),
+                                                () -> FIXED_TS);
                                 StepForSigning step =
                                         new StepForSigning(
                                                 "step_abc",

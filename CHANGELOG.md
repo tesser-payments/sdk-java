@@ -6,6 +6,8 @@
 
 - `LocalSigner.signStep(...)` supports `TEMPO` and `TEMPO_MODERATO`. Tesser
   completes and broadcasts the transfer and pays the network fee.
+- `LocalSigner` accepts an optional `java.net.http.HttpClient`, for example
+  to configure a proxy.
 - Initial release. `LocalSigner.signCreateWallet` and `LocalSigner.signStep`,
   at parity with the Kotlin SDK's 0.0.4 wire output, verified byte-for-byte by
   `GoldenBodyParityTest` against fixtures generated from the Kotlin SDK.
@@ -24,6 +26,21 @@
   configuration for Gradle and GitHub Actions.
 
 ### Changed
+
+- **Breaking:** `LocalSigner` requires an `apiBaseUrl`
+  (`new LocalSigner(signing, apiBaseUrl)`): `https://api.tesser.xyz` in
+  production, `https://api-sandbox.tesser.xyz` in sandbox. It must be an
+  https URL. A trailing `/` or `/v1` is removed.
+- `LocalSigner.signCreateWallet(...)` for `STABLECOIN_ETHEREUM` fetches the
+  request to sign from the Tesser API and checks that it matches your
+  parameters before signing. The method signature and result format are
+  unchanged.
+- `signCreateWallet` can fail with `TesserError.APIError`,
+  `TesserError.ConnectionError`, and `TesserError.TimeoutError` when fetching
+  the request. `ConnectionError`, `TimeoutError`, and an `APIError` with
+  status 429 or 5xx are safe to retry; an `APIError` with any other 4xx
+  status fails the same way on retry. A fetched request that does not match
+  fails with `TesserError.SigningError`, and nothing is signed.
 
 These diverge from the Kotlin SDK deliberately. None of them change the signed
 body, so `GoldenBodyParityTest` is unaffected.
@@ -49,6 +66,7 @@ body, so `GoldenBodyParityTest` is unaffected.
 
 ### Removed
 
+- **Breaking:** the `LocalSigner(SigningConfig)` constructor.
 - `internal.util.Redact`. It had no callers, its Javadoc claimed a use that did
   not exist, and its pattern did not match `privateKey`, the one key it would
   most plausibly have been pointed at.

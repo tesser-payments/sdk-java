@@ -34,10 +34,12 @@ import xyz.tesser.sdk.java.*;
 
 public class Example {
     public static void main(String[] args) {
-        LocalSigner signer = new LocalSigner(new SigningConfig(
-            System.getenv("SIGNING_PUBLIC_KEY"),
-            System.getenv("SIGNING_PRIVATE_KEY"),
-            System.getenv("SIGNING_ENCLAVE_ID")));
+        LocalSigner signer = new LocalSigner(
+            new SigningConfig(
+                System.getenv("SIGNING_PUBLIC_KEY"),
+                System.getenv("SIGNING_PRIVATE_KEY"),
+                System.getenv("SIGNING_ENCLAVE_ID")),
+            "https://api.tesser.xyz"); // sandbox: https://api-sandbox.tesser.xyz
 
         CompletableFuture<SignedResult> future = signer.signCreateWallet(
             new CreateWalletParams("My wallet", WalletType.STABLECOIN_ETHEREUM));
@@ -61,19 +63,28 @@ rebalance flows in their own READMEs.
 
 ## What's included
 
-- `LocalSigner.signCreateWallet(...)` builds and signs an
-  `ACTIVITY_TYPE_CREATE_WALLET` payload locally. No network calls; the private
-  key never leaves the JVM.
-- `LocalSigner.signStep(...)` signs the unsigned transaction bytes that the
-  Tesser API delivers via a `step.signature_requested` webhook event. The
-  resulting signature is the value submitted back to
+- `new LocalSigner(signing, apiBaseUrl)` requires the Tesser API base URL
+  (`https://api.tesser.xyz` or `https://api-sandbox.tesser.xyz`). An optional
+  `java.net.http.HttpClient` can be passed to configure a proxy.
+- `LocalSigner.signCreateWallet(...)` signs a wallet-creation request. For
+  `STABLECOIN_ETHEREUM`, it first fetches the request to sign from the Tesser
+  API and checks that it matches your parameters. The private key never leaves
+  the JVM.
+- `LocalSigner.signStep(...)` authorizes the transaction with your API key,
+  without changing it. The transaction is the one the Tesser API delivers via
+  a `step.signature_requested` webhook event. The resulting signature is the
+  value submitted back to
   `POST /v1/treasury/rebalances/{transferId}/steps/{stepId}/sign`.
 - Three wallet types: `STABLECOIN_ETHEREUM`, `STABLECOIN_SOLANA`, and
-  `STABLECOIN_STELLAR`. Ethereum is exercised end-to-end against Tesser
-  staging. Solana and Stellar are not yet verified against the live API.
+  `STABLECOIN_STELLAR`. Tesser currently supports managed wallets for
+  `STABLECOIN_ETHEREUM` only.
 - Sealed `TesserError` hierarchy. The signer reports `ConfigError` for bad
-  input (blank keys, a mismatched key pair, an unknown wallet type) and
-  `SigningError` for any cryptographic failure.
+  input (a mismatched key pair, an invalid `apiBaseUrl`, an unknown wallet
+  type) and `SigningError` for any signing failure or a fetched request that
+  does not match your parameters. Fetching the request can fail with
+  `APIError`, `ConnectionError`, or `TimeoutError`. `ConnectionError`,
+  `TimeoutError`, and an `APIError` with status 429 or 5xx are safe to retry;
+  an `APIError` with any other 4xx status fails the same way on retry.
 - A JPMS module descriptor. The published jar is the named module
   `xyz.tesser.sdk.java` and exports only `xyz.tesser.sdk.java` and
   `xyz.tesser.sdk.java.error`; `xyz.tesser.sdk.java.internal.*` is `public` only
@@ -107,18 +118,19 @@ misseeded `SecureRandom` would leak the private scalar.
 Every signing method returns a `CompletableFuture`. Three properties are worth
 knowing, and all three are pinned by tests so they cannot regress:
 
-- **Work runs on the calling thread.** Nothing is dispatched to the common
-  `ForkJoinPool`; the returned future is already complete. The future type
-  exists so that adding external I/O later (an MPC co-signer call inside the
-  stamper) is not a breaking change. If that happens, an `Executor` overload
-  will appear alongside the current methods.
+- **Signing runs on the calling thread.** Nothing is dispatched to the common
+  `ForkJoinPool`. `signStep` and `signCreateWallet` for Solana and Stellar
+  return a future that is already complete. `signCreateWallet` for
+  `STABLECOIN_ETHEREUM` first waits for a request to Tesser, so its future
+  completes later, on a thread of the `HttpClient`.
 - **Failures arrive as a failed future, not a synchronous throw.** This holds
   for *exceptions*. `Error` and its subclasses (a `NoClassDefFoundError` from a
   missing Bouncy Castle, an `OutOfMemoryError`) still propagate from the call
   site, because catching them to stuff into a future would do more harm than
   good. The one deliberate exception is `LocalSigner`'s constructor, which
   validates eagerly: `IllegalArgumentException` for a blank field,
-  `TesserError.ConfigError` for a malformed or mismatched key pair. Construction
+  `TesserError.ConfigError` for a malformed or mismatched key pair or an
+  invalid `apiBaseUrl`. Construction
   is not a future-returning operation, and a configuration error is worth
   finding once at startup rather than on every call.
 - **`LocalSigner` is thread-safe and reentrant.** It holds no mutable state, so

@@ -12,9 +12,11 @@ import java.util.Map;
  * clauses through every caller and a try/catch inside every lambda handed to a CompletableFuture.
  *
  * <p>The signer throws {@link ConfigError} for bad caller input and {@link SigningError} for
- * cryptographic failures. {@link APIError}, {@link ConnectionError} and {@link TimeoutError} are
- * part of the public surface so future HTTP-issuing operations can throw them without a breaking
- * change.
+ * signing failures or a fetched request that does not match the caller's parameters. {@link
+ * APIError}, {@link ConnectionError} and {@link TimeoutError} come from the request {@code
+ * LocalSigner.signCreateWallet} makes to Tesser for Ethereum wallets. {@link ConnectionError},
+ * {@link TimeoutError}, and an {@link APIError} with status 429 or 5xx are safe to retry; an {@link
+ * APIError} with any other 4xx status fails the same way on retry.
  */
 public abstract sealed class TesserError extends RuntimeException
         permits TesserError.ConfigError,
@@ -60,7 +62,10 @@ public abstract sealed class TesserError extends RuntimeException
         }
     }
 
-    /** Local signing failure. Wraps cryptographic stamper errors. */
+    /**
+     * Local signing failure. Wraps cryptographic stamper errors and a fetched request that does not
+     * match the caller's parameters.
+     */
     public static final class SigningError extends TesserError {
         public SigningError(String message) {
             this(message, null);

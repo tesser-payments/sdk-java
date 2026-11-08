@@ -7,12 +7,14 @@
  * are excluded from the {@code apiCheck} lockfile, and this descriptor is what actually makes them
  * unreachable from a consumer's module rather than merely undocumented.
  *
- * <p>All three requirements are non-transitive: Jackson, Bouncy Castle and SLF4J are implementation
- * details that no exported signature mentions, so they must not leak onto a consumer's module
- * graph.
+ * <p>Jackson, Bouncy Castle and SLF4J are non-transitive: they are implementation details that no
+ * exported signature mentions, so they must not leak onto a consumer's module graph. {@code
+ * java.net.http} is transitive because a {@link xyz.tesser.sdk.java.LocalSigner} constructor takes
+ * an {@link java.net.http.HttpClient}.
  */
 module xyz.tesser.sdk.java {
     requires com.fasterxml.jackson.databind;
+    requires transitive java.net.http;
     requires org.bouncycastle.provider;
     requires org.slf4j;
 
