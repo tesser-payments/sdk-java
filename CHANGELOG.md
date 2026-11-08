@@ -2,11 +2,17 @@
 
 ## Unreleased
 
+## 0.2.0 - 2026-11-08
+
 ### Added
 
 - `apiBaseUrl` is optional again, and `new LocalSigner(signing)` is back,
   along with `new LocalSigner(signing, httpClient)`. Code written for 0.0.3
-  compiles and runs unchanged.
+  needs no change. Ethereum wallet creation now makes a network request: it
+  needs outbound HTTPS (see the upgrade note), its future completes after the
+  request rather than immediately (don't rely on `getNow`), and it can fail
+  with `APIError`, `ConnectionError` or `TimeoutError`. Custom runtime images
+  must include the `java.net.http` module.
 - Without `apiBaseUrl`, the first Ethereum `signCreateWallet` tries
   production and, if production does not accept your signing key, sandbox,
   and the signer remembers that environment for later calls. If neither
@@ -15,6 +21,7 @@
 ### Changed
 
 - With `apiBaseUrl` set, behaviour is unchanged: only that URL is used.
+- The examples build the signer without `apiBaseUrl`.
 
 ### Upgrade note
 
