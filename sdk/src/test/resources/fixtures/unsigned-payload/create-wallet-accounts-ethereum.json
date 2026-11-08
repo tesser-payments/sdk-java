@@ -1,0 +1,8 @@
+{
+  "data": {
+    "organization_id": "846abdbb-d019-4d97-9404-0f7cfc113b2c",
+    "master_wallet_id": "dc927899-5724-5c9b-9111-4cf9fafde1cd",
+    "derivation_path": "m/44'/60'/85190642'/0/2001569898",
+    "body": "{\"type\":\"ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS\",\"timestampMs\":\"1794141873522\",\"organizationId\":\"846abdbb-d019-4d97-9404-0f7cfc113b2c\",\"parameters\":{\"walletId\":\"dc927899-5724-5c9b-9111-4cf9fafde1cd\",\"accounts\":[{\"curve\":\"CURVE_SECP256K1\",\"pathFormat\":\"PATH_FORMAT_BIP32\",\"path\":\"m/44'/60'/85190642'/0/2001569898\",\"addressFormat\":\"ADDRESS_FORMAT_ETHEREUM\",\"name\":\"sdk-java-stg-1794141872\"}]}}"
+  }
+}

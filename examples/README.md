@@ -21,8 +21,9 @@ Verifies `LocalSigner.signCreateWallet` against Tesser staging by performing the
 full happy path:
 
 1. OAuth `client_credentials` token exchange against the configured auth URL.
-2. Build a `CreateWalletParams` and call `LocalSigner.signCreateWallet(...)` to
-   produce the signed payload locally.
+2. Build a `CreateWalletParams` and call `LocalSigner.signCreateWallet(...)`.
+   For `stablecoin_ethereum` the SDK fetches the request to sign from the
+   Tesser API, checks that it matches your parameters, and signs it locally.
 3. POST the signed payload to `${API_BASE_URL}/v1/accounts/wallets`.
 4. Print the API response, or fail loudly if any step errors.
 

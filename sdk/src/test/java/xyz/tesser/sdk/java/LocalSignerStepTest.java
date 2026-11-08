@@ -12,11 +12,14 @@ import java.util.concurrent.CompletableFuture;
 import org.junit.jupiter.api.Test;
 import xyz.tesser.sdk.java.internal.signing.Stamp;
 import xyz.tesser.sdk.java.internal.signing.StampResult;
+import xyz.tesser.sdk.java.internal.signing.StubHttpClient;
 import xyz.tesser.sdk.java.internal.util.Json;
 
 class LocalSignerStepTest {
 
     private static final SigningConfig CFG = TestKeys.config("org_local_signer_step_test");
+
+    private static final String API_BASE_URL = "https://api.tesser.xyz";
 
     private static final StepForSigning STEP =
             new StepForSigning(
@@ -37,14 +40,20 @@ class LocalSignerStepTest {
 
     @Test
     void signStepReturnsANonEmptyBase64Signature() throws Exception {
-        SignedStepResult result = new LocalSigner(CFG, stubStamp()).signStep(STEP).get();
+        SignedStepResult result =
+                new LocalSigner(CFG, API_BASE_URL, StubHttpClient.unused(), stubStamp())
+                        .signStep(STEP)
+                        .get();
         assertThat(result.signature()).isNotBlank();
         assertThat(result.metadata().stampHeaderValue()).isEqualTo("STAMP_VALUE");
     }
 
     @Test
     void signStepBodyReferencesUnsignedTransactionAndSignWith() throws Exception {
-        SignedStepResult result = new LocalSigner(CFG, stubStamp()).signStep(STEP).get();
+        SignedStepResult result =
+                new LocalSigner(CFG, API_BASE_URL, StubHttpClient.unused(), stubStamp())
+                        .signStep(STEP)
+                        .get();
         String composite =
                 new String(Base64.getDecoder().decode(result.signature()), StandardCharsets.UTF_8);
         JsonNode body = Json.readTree(composite);
@@ -56,7 +65,10 @@ class LocalSignerStepTest {
 
     @Test
     void signStepEchoesTheUnsignedTransaction() throws Exception {
-        SignedStepResult result = new LocalSigner(CFG, stubStamp()).signStep(STEP).get();
+        SignedStepResult result =
+                new LocalSigner(CFG, API_BASE_URL, StubHttpClient.unused(), stubStamp())
+                        .signStep(STEP)
+                        .get();
         assertThat(result.unsignedTransaction()).isEqualTo(STEP.unsignedTransaction());
     }
 
@@ -65,7 +77,13 @@ class LocalSignerStepTest {
         // Deterministic clock is essential here, not incidental: bodies embed
         // timestampMs, so with the real clock this comparison fails whenever the
         // millisecond happens to flip between the two calls.
-        LocalSigner signer = new LocalSigner(CFG, stubStamp(), () -> 1_700_000_000_000L);
+        LocalSigner signer =
+                new LocalSigner(
+                        CFG,
+                        API_BASE_URL,
+                        StubHttpClient.unused(),
+                        stubStamp(),
+                        () -> 1_700_000_000_000L);
         SignedStepResult withDefault = signer.signStep(STEP).get();
         SignedStepResult withExplicit = signer.signStep(STEP, new SignStepOptions()).get();
         assertThat(withDefault.metadata().body()).isEqualTo(withExplicit.metadata().body());

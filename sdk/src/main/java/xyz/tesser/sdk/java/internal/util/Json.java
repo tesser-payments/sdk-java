@@ -4,17 +4,17 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.CharacterEscapes;
 import com.fasterxml.jackson.core.io.SerializedString;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import xyz.tesser.sdk.java.error.TesserError;
 
 /**
- * The single JSON writer for the SDK.
+ * The single JSON writer and reader for the SDK.
  *
- * <p>Only writing is needed: the SDK never deserializes anything. Output must be byte-identical to
- * kotlinx.serialization's, because the signature is base64 of this exact text; see
- * JsonEscapingParityTest.
+ * <p>Output must be byte-identical to kotlinx.serialization's, because the signature is base64 of
+ * this exact text; see JsonEscapingParityTest.
  *
  * <p>ObjectNode preserves insertion order (it is LinkedHashMap-backed), and Jackson writes compact
  * by default, which together match {@code buildJsonObject { ... }.toString()}.
@@ -103,13 +103,12 @@ public final class Json {
         }
     }
 
-    /**
-     * Parses {@code json}. Used only by tests and fixtures; the SDK itself never deserializes
-     * anything.
-     */
+    /** Parses {@code json}, rejecting trailing content after the first value. */
     public static JsonNode readTree(String json) {
         try {
-            return MAPPER.readTree(json);
+            return MAPPER.reader()
+                    .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+                    .readTree(json);
         } catch (JsonProcessingException e) {
             throw new IllegalArgumentException("Not valid JSON", e);
         }

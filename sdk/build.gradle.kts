@@ -41,6 +41,14 @@ tasks.test {
     useJUnitPlatform()
 }
 
+tasks.processResources {
+    val sdkVersion = project.version.toString()
+    inputs.property("sdkVersion", sdkVersion)
+    filesMatching("xyz/tesser/sdk/java/internal/util/sdk-version.properties") {
+        expand("version" to sdkVersion)
+    }
+}
+
 // No Automatic-Module-Name: src/main/java/module-info.java declares a real
 // module of the same name, and an explicit descriptor makes the manifest
 // attribute dead weight -- the JVM ignores it once module-info.class is present.

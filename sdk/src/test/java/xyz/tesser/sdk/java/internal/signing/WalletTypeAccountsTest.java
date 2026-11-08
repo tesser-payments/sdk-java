@@ -9,24 +9,15 @@ import xyz.tesser.sdk.java.WalletType;
 class WalletTypeAccountsTest {
 
     @Test
-    void everyWalletTypeHasAtLeastOneAccountSpec() {
-        for (WalletType wt : WalletType.values()) {
-            assertThat(WalletTypeAccounts.forType(wt))
-                    .as("specs for %s", wt)
-                    .isNotNull()
-                    .isNotEmpty();
+    void everyLocallyBuiltWalletTypeHasExactlyOneAccountSpec() {
+        for (WalletType wt : List.of(WalletType.STABLECOIN_SOLANA, WalletType.STABLECOIN_STELLAR)) {
+            assertThat(WalletTypeAccounts.forType(wt)).as("specs for %s", wt).hasSize(1);
         }
     }
 
     @Test
-    void ethereumSpecUsesSecp256k1AndEthereumAddressFormat() {
-        List<AccountSpec> specs = WalletTypeAccounts.forType(WalletType.STABLECOIN_ETHEREUM);
-        assertThat(specs).hasSize(1);
-        AccountSpec spec = specs.get(0);
-        assertThat(spec.curve()).isEqualTo("CURVE_SECP256K1");
-        assertThat(spec.pathFormat()).isEqualTo("PATH_FORMAT_BIP32");
-        assertThat(spec.path()).isEqualTo("m/44'/60'/0'/0/0");
-        assertThat(spec.addressFormat()).isEqualTo("ADDRESS_FORMAT_ETHEREUM");
+    void ethereumHasNoLocalAccountSpec() {
+        assertThat(WalletTypeAccounts.forType(WalletType.STABLECOIN_ETHEREUM)).isNull();
     }
 
     @Test

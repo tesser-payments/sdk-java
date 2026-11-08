@@ -25,6 +25,9 @@ class CreateWalletActivityTest {
 
     private static final LongSupplier FIXED_CLOCK = () -> 1_700_000_000_000L;
 
+    private static final TesserApiConnection NO_REQUESTS =
+            new TesserApiConnection("https://api.tesser.xyz", StubHttpClient.unused());
+
     private static Stamp mockStamp() {
         Stamp stamp = mock(Stamp.class);
         when(stamp.stamp(any(), any()))
@@ -40,9 +43,10 @@ class CreateWalletActivityTest {
                 CreateWalletActivity.sign(
                                 CFG,
                                 new CreateWalletParams(
-                                        "test wallet", WalletType.STABLECOIN_ETHEREUM),
+                                        "test wallet", WalletType.STABLECOIN_STELLAR),
                                 mockStamp(),
-                                FIXED_CLOCK)
+                                FIXED_CLOCK,
+                                NO_REQUESTS)
                         .get();
 
         JsonNode body = Json.readTree(result.metadata().body());
@@ -56,20 +60,20 @@ class CreateWalletActivityTest {
         SignedResult result =
                 CreateWalletActivity.sign(
                                 CFG,
-                                new CreateWalletParams("alpha", WalletType.STABLECOIN_ETHEREUM),
+                                new CreateWalletParams("alpha", WalletType.STABLECOIN_STELLAR),
                                 mockStamp(),
-                                FIXED_CLOCK)
+                                FIXED_CLOCK,
+                                NO_REQUESTS)
                         .get();
 
         JsonNode params = Json.readTree(result.metadata().body()).get("parameters");
         assertThat(params.get("walletName").asText()).isEqualTo("alpha");
         JsonNode accounts = params.get("accounts");
         assertThat(accounts).hasSize(1);
-        assertThat(accounts.get(0).get("curve").asText()).isEqualTo("CURVE_SECP256K1");
+        assertThat(accounts.get(0).get("curve").asText()).isEqualTo("CURVE_ED25519");
         assertThat(accounts.get(0).get("pathFormat").asText()).isEqualTo("PATH_FORMAT_BIP32");
-        assertThat(accounts.get(0).get("path").asText()).isEqualTo("m/44'/60'/0'/0/0");
-        assertThat(accounts.get(0).get("addressFormat").asText())
-                .isEqualTo("ADDRESS_FORMAT_ETHEREUM");
+        assertThat(accounts.get(0).get("path").asText()).isEqualTo("m/44'/148'/0'");
+        assertThat(accounts.get(0).get("addressFormat").asText()).isEqualTo("ADDRESS_FORMAT_XLM");
     }
 
     @Test
@@ -77,9 +81,10 @@ class CreateWalletActivityTest {
         SignedResult result =
                 CreateWalletActivity.sign(
                                 CFG,
-                                new CreateWalletParams("alpha", WalletType.STABLECOIN_ETHEREUM),
+                                new CreateWalletParams("alpha", WalletType.STABLECOIN_STELLAR),
                                 mockStamp(),
-                                FIXED_CLOCK)
+                                FIXED_CLOCK,
+                                NO_REQUESTS)
                         .get();
 
         String decoded =
@@ -94,9 +99,10 @@ class CreateWalletActivityTest {
         SignedResult result =
                 CreateWalletActivity.sign(
                                 CFG,
-                                new CreateWalletParams("alpha", WalletType.STABLECOIN_ETHEREUM),
+                                new CreateWalletParams("alpha", WalletType.STABLECOIN_STELLAR),
                                 mockStamp(),
-                                FIXED_CLOCK)
+                                FIXED_CLOCK,
+                                NO_REQUESTS)
                         .get();
         assertThat(result.metadata().stampHeaderName()).isEqualTo("X-Stamp");
         assertThat(result.metadata().stampHeaderValue()).isEqualTo("FAKE_STAMP_VALUE");
@@ -110,9 +116,10 @@ class CreateWalletActivityTest {
         SignedResult result =
                 CreateWalletActivity.sign(
                                 CFG,
-                                new CreateWalletParams("alpha", WalletType.STABLECOIN_ETHEREUM),
+                                new CreateWalletParams("alpha", WalletType.STABLECOIN_STELLAR),
                                 stamp,
-                                FIXED_CLOCK)
+                                FIXED_CLOCK,
+                                NO_REQUESTS)
                         .get();
 
         org.mockito.Mockito.verify(stamp).stamp(any(), bodyCaptor.capture());
@@ -126,7 +133,8 @@ class CreateWalletActivityTest {
                                 CFG,
                                 new CreateWalletParams("sol", WalletType.STABLECOIN_SOLANA),
                                 mockStamp(),
-                                FIXED_CLOCK)
+                                FIXED_CLOCK,
+                                NO_REQUESTS)
                         .get();
         assertThat(result.metadata().body())
                 .contains("CURVE_ED25519")
@@ -139,14 +147,15 @@ class CreateWalletActivityTest {
         SignedResult result =
                 CreateWalletActivity.sign(
                                 CFG,
-                                new CreateWalletParams("a", WalletType.STABLECOIN_ETHEREUM),
+                                new CreateWalletParams("a", WalletType.STABLECOIN_STELLAR),
                                 mockStamp(),
-                                FIXED_CLOCK)
+                                FIXED_CLOCK,
+                                NO_REQUESTS)
                         .get();
         assertThat(result.metadata().body())
                 .startsWith(
                         "{\"type\":\"ACTIVITY_TYPE_CREATE_WALLET\",\"timestampMs\":\"1700000000000\","
                                 + "\"organizationId\":\"org_test_123\",\"parameters\":{\"walletName\":\"a\","
-                                + "\"accounts\":[{\"curve\":\"CURVE_SECP256K1\",\"pathFormat\":\"PATH_FORMAT_BIP32\",");
+                                + "\"accounts\":[{\"curve\":\"CURVE_ED25519\",\"pathFormat\":\"PATH_FORMAT_BIP32\",");
     }
 }

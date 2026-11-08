@@ -5,24 +5,17 @@ import java.util.Map;
 import xyz.tesser.sdk.java.WalletType;
 
 /**
- * Wallet type to account-spec lookup.
+ * Wallet type to account-spec lookup for the locally-built {@code ACTIVITY_TYPE_CREATE_WALLET}
+ * body. Ethereum has no entry: its body is built by Tesser (see {@link UnsignedPayload}).
  *
- * <p>The Ethereum spec is verified end-to-end against Tesser staging. The Solana and Stellar specs
- * are NOT yet verified against the live API; if either fails for a spec-related reason, file the
- * API response so the spec can be adjusted. This caveat is carried over verbatim from the Kotlin
- * SDK.
+ * <p>The Solana and Stellar specs are NOT yet verified against the live API; if either fails for a
+ * spec-related reason, file the API response so the spec can be adjusted. This caveat is carried
+ * over verbatim from the Kotlin SDK.
  */
 public final class WalletTypeAccounts {
 
     private static final Map<WalletType, List<AccountSpec>> SPECS =
             Map.of(
-                    WalletType.STABLECOIN_ETHEREUM,
-                    List.of(
-                            new AccountSpec(
-                                    "CURVE_SECP256K1",
-                                    "PATH_FORMAT_BIP32",
-                                    "m/44'/60'/0'/0/0",
-                                    "ADDRESS_FORMAT_ETHEREUM")),
                     WalletType.STABLECOIN_SOLANA,
                     List.of(
                             new AccountSpec(

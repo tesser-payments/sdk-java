@@ -71,7 +71,8 @@ public final class Main {
                 "Fetching access token from %s (audience=%s) ...%n", authTokenUrl, audience);
         String token = fetchToken(authTokenUrl, clientId, clientSecret, audience);
 
-        LocalSigner signer = new LocalSigner(new SigningConfig(pubKey, privKey, enclaveId));
+        LocalSigner signer =
+                new LocalSigner(new SigningConfig(pubKey, privKey, enclaveId), baseUrl);
         System.out.printf(
                 "Signing CreateWallet activity for type=%s name=%s ...%n", walletType, walletName);
         SignedResult signed =
