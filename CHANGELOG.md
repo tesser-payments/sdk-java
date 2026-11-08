@@ -2,12 +2,69 @@
 
 ## Unreleased
 
+## 0.1.0 - 2026-11-08
+
 ### Added
 
-- `LocalSigner.signStep(...)` supports `TEMPO` and `TEMPO_MODERATO`. Tesser
-  completes and broadcasts the transfer and pays the network fee.
+- `LocalSigner.signStep(...)` supports `TEMPO_MODERATO`.
 - `LocalSigner` accepts an optional `java.net.http.HttpClient`, for example
   to configure a proxy.
+
+### Changed
+
+- **Breaking:** `LocalSigner` requires an `apiBaseUrl`
+  (`new LocalSigner(signing, apiBaseUrl)`): `https://api.tesser.xyz` in
+  production, `https://api-sandbox.tesser.xyz` in sandbox. It must be an
+  https URL. A trailing `/` or `/v1` is removed.
+- `LocalSigner.signCreateWallet(...)` for `STABLECOIN_ETHEREUM` fetches the
+  request to sign from the Tesser API and checks that it matches your
+  parameters before signing. The method signature and result format are
+  unchanged.
+- `signCreateWallet` can fail with `TesserError.APIError`,
+  `TesserError.ConnectionError`, and `TesserError.TimeoutError` when fetching
+  the request. `ConnectionError`, `TimeoutError`, and an `APIError` with
+  status 429 or 5xx are safe to retry; an `APIError` with any other 4xx
+  status fails the same way on retry. A fetched request that does not match
+  fails with `TesserError.SigningError`, and nothing is signed.
+
+### Removed
+
+- **Breaking:** the `LocalSigner(SigningConfig)` constructor.
+
+### Fixed
+
+- `TEMPO` steps were signed with the wrong transaction type and were rejected.
+  `LocalSigner.signStep(...)` now signs `TEMPO` and `TEMPO_MODERATO` steps as
+  Tempo transactions: the SDK authorizes the transaction with your API key,
+  without changing it; Tesser completes the transfer, broadcasts it, and pays
+  the network fee.
+
+## 0.0.3 - 2026-09-23
+
+### Added
+
+- `TEMPO` in the supported step-signing network list.
+
+### Fixed
+
+- The README install snippets referenced `0.0.1`, which was never published;
+  they now match `gradle.properties`. The `create-wallet` link now lands on the
+  walkthrough in `examples/README.md` instead of a bare directory listing.
+- All three examples share one `HttpClient` with a connect timeout and apply a
+  per-request timeout, replacing a fresh client per call with no timeout at
+  all, where a stalled connection would hang the run past its own deadlines.
+
+### Security
+
+- `ci.yml` now declares `permissions: contents: read` instead of inheriting the
+  repository default token permissions, and `release.yml` scopes
+  `contents: write` to the publish job that actually pushes the tag; the gate
+  job runs read-only.
+
+## 0.0.1 - 2026-09-12
+
+### Added
+
 - Initial release. `LocalSigner.signCreateWallet` and `LocalSigner.signStep`,
   at parity with the Kotlin SDK's 0.0.4 wire output, verified byte-for-byte by
   `GoldenBodyParityTest` against fixtures generated from the Kotlin SDK.
@@ -26,21 +83,6 @@
   configuration for Gradle and GitHub Actions.
 
 ### Changed
-
-- **Breaking:** `LocalSigner` requires an `apiBaseUrl`
-  (`new LocalSigner(signing, apiBaseUrl)`): `https://api.tesser.xyz` in
-  production, `https://api-sandbox.tesser.xyz` in sandbox. It must be an
-  https URL. A trailing `/` or `/v1` is removed.
-- `LocalSigner.signCreateWallet(...)` for `STABLECOIN_ETHEREUM` fetches the
-  request to sign from the Tesser API and checks that it matches your
-  parameters before signing. The method signature and result format are
-  unchanged.
-- `signCreateWallet` can fail with `TesserError.APIError`,
-  `TesserError.ConnectionError`, and `TesserError.TimeoutError` when fetching
-  the request. `ConnectionError`, `TimeoutError`, and an `APIError` with
-  status 429 or 5xx are safe to retry; an `APIError` with any other 4xx
-  status fails the same way on retry. A fetched request that does not match
-  fails with `TesserError.SigningError`, and nothing is signed.
 
 These diverge from the Kotlin SDK deliberately. None of them change the signed
 body, so `GoldenBodyParityTest` is unaffected.
@@ -66,7 +108,6 @@ body, so `GoldenBodyParityTest` is unaffected.
 
 ### Removed
 
-- **Breaking:** the `LocalSigner(SigningConfig)` constructor.
 - `internal.util.Redact`. It had no callers, its Javadoc claimed a use that did
   not exist, and its pattern did not match `privateKey`, the one key it would
   most plausibly have been pointed at.
@@ -85,19 +126,9 @@ body, so `GoldenBodyParityTest` is unaffected.
 - All three examples parse the OAuth `access_token` with Jackson rather than a
   regex, and `create-wallet` builds its request body with `ObjectMapper` rather
   than string concatenation.
-- The README install snippets referenced `0.0.1`, which was never published;
-  they now match `gradle.properties`. The `create-wallet` link now lands on the
-  walkthrough in `examples/README.md` instead of a bare directory listing.
-- All three examples share one `HttpClient` with a connect timeout and apply a
-  per-request timeout, replacing a fresh client per call with no timeout at
-  all, where a stalled connection would hang the run past its own deadlines.
 
 ### Security
 
 - The Gradle distribution is pinned by SHA-256 in `gradle-wrapper.properties`.
 - `release.yml` passes `workflow_dispatch` inputs to the shell through `env:`
   rather than `${{ }}` interpolation.
-- `ci.yml` now declares `permissions: contents: read` instead of inheriting the
-  repository default token permissions, and `release.yml` scopes
-  `contents: write` to the publish job that actually pushes the tag; the gate
-  job runs read-only.
