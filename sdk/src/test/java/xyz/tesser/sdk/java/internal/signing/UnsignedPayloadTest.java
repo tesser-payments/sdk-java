@@ -50,7 +50,7 @@ class UnsignedPayloadTest {
             };
 
     private static TesserApiConnection connection(HttpClient httpClient) {
-        return new TesserApiConnection("https://api.tesser.xyz", httpClient);
+        return TesserApiConnection.create("https://api.tesser.xyz", httpClient);
     }
 
     private static StubHttpClient clientReturningEthereumFixture() {

@@ -79,7 +79,7 @@ public final class Main {
 
     public static void main(String[] args) throws Exception {
         ExampleConfig config = ExampleConfig.fromEnv();
-        LocalSigner signer = new LocalSigner(config.signing(), config.tesserBaseUrl());
+        LocalSigner signer = new LocalSigner(config.signing());
         System.out.println("Signer ready for enclave=" + signer.signing().enclaveId());
 
         String token = fetchAccessToken(config);

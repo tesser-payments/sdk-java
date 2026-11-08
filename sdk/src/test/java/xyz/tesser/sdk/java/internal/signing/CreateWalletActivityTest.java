@@ -26,7 +26,7 @@ class CreateWalletActivityTest {
     private static final LongSupplier FIXED_CLOCK = () -> 1_700_000_000_000L;
 
     private static final TesserApiConnection NO_REQUESTS =
-            new TesserApiConnection("https://api.tesser.xyz", StubHttpClient.unused());
+            TesserApiConnection.create("https://api.tesser.xyz", StubHttpClient.unused());
 
     private static Stamp mockStamp() {
         Stamp stamp = mock(Stamp.class);

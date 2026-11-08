@@ -9,6 +9,7 @@ import java.net.http.HttpResponse;
 import java.security.NoSuchAlgorithmException;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -20,10 +21,15 @@ import javax.net.ssl.SSLParameters;
 public final class StubHttpClient extends HttpClient {
 
     private final Function<HttpRequest, CompletableFuture<HttpResponse<String>>> respond;
-    private final List<HttpRequest> requests = new ArrayList<>();
+    private final List<HttpRequest> requests = Collections.synchronizedList(new ArrayList<>());
 
     private StubHttpClient(Function<HttpRequest, CompletableFuture<HttpResponse<String>>> respond) {
         this.respond = respond;
+    }
+
+    public static StubHttpClient responding(
+            Function<HttpRequest, CompletableFuture<HttpResponse<String>>> respond) {
+        return new StubHttpClient(respond);
     }
 
     public static StubHttpClient respondingWith(HttpResponse<String> response) {

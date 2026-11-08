@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Test;
 import xyz.tesser.sdk.java.error.TesserError;
@@ -126,5 +127,26 @@ class FutureSemanticsTest {
                 .failsWithin(Duration.ZERO)
                 .withThrowableOfType(ExecutionException.class)
                 .withCauseInstanceOf(TesserError.ConnectionError.class);
+    }
+
+    @Test
+    void failureAfterFallingBackToSandboxReachesWhenCompleteAsCompletionException()
+            throws Exception {
+        String signingKeyNotAccepted =
+                "{\"errors\":[{\"error_code\":\"signing-4010\","
+                        + "\"error_message\":\"Signing key not accepted\"}]}";
+        LocalSigner signer =
+                new LocalSigner(
+                        CFG,
+                        StubHttpClient.respondingWith(
+                                new StubHttpResponse(401, signingKeyNotAccepted)));
+        CompletableFuture<Throwable> observed = new CompletableFuture<>();
+
+        signer.signCreateWallet(ethereumParams())
+                .whenComplete((result, failure) -> observed.complete(failure));
+
+        assertThat(observed.get())
+                .isInstanceOf(CompletionException.class)
+                .hasCauseInstanceOf(TesserError.APIError.class);
     }
 }

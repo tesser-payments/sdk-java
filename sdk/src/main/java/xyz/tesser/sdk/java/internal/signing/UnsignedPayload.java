@@ -18,11 +18,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
 import xyz.tesser.sdk.java.CreateWalletParams;
 import xyz.tesser.sdk.java.SigningConfig;
 import xyz.tesser.sdk.java.error.TesserError;
 import xyz.tesser.sdk.java.error.TesserErrorDetail;
 import xyz.tesser.sdk.java.internal.util.Json;
+import xyz.tesser.sdk.java.internal.util.Logging;
 import xyz.tesser.sdk.java.internal.util.SdkVersion;
 
 public final class UnsignedPayload {
@@ -32,10 +34,22 @@ public final class UnsignedPayload {
             "ACTIVITY_TYPE_CREATE_WALLET_ACCOUNTS";
     private static final String ETHEREUM_ADDRESS_FORMAT = "ADDRESS_FORMAT_ETHEREUM";
 
+    private static final String SIGNING_KEY_NOT_ACCEPTED_ERROR_CODE = "signing-4010";
+    private static final int UNAUTHORIZED_STATUS = 401;
+
+    private static final Logger LOG = Logging.logger("xyz.tesser.sdk.java.LocalSigner");
+
     private UnsignedPayload() {}
 
     private record UnsignedPayloadQuery(
             String organizationId, String name, String type, String timestampMs) {}
+
+    private record UnsignedPayloadFetch(
+            HttpClient httpClient,
+            SigningConfig signing,
+            CreateWalletParams params,
+            Stamp stamp,
+            LongSupplier clock) {}
 
     public static CompletableFuture<String> fetchCheckedCreateWalletAccountsBody(
             TesserApiConnection api,
@@ -43,15 +57,117 @@ public final class UnsignedPayload {
             CreateWalletParams params,
             Stamp stamp,
             LongSupplier clock) {
-        UnsignedPayloadQuery query = buildUnsignedPayloadQuery(signing, params, clock);
-        return stamp.stamp(signing, buildCanonicalUnsignedPayloadMessage(query))
+        UnsignedPayloadFetch fetch =
+                new UnsignedPayloadFetch(api.httpClient(), signing, params, stamp, clock);
+        String resolvedBaseUrl = api.resolvedBaseUrl();
+        if (resolvedBaseUrl != null) {
+            return fetchCheckedBodyFrom(resolvedBaseUrl, fetch);
+        }
+        return detectEnvironmentAndFetchCheckedBody(api, fetch, 0, null);
+    }
+
+    private static CompletableFuture<String> detectEnvironmentAndFetchCheckedBody(
+            TesserApiConnection api,
+            UnsignedPayloadFetch fetch,
+            int candidateIndex,
+            Throwable firstRejection) {
+        String baseUrl = api.candidateBaseUrls().get(candidateIndex);
+        return attemptCheckedBodyFrom(baseUrl, fetch)
+                .thenApply(body -> rememberApiBaseUrl(api, baseUrl, body))
+                .exceptionallyCompose(
+                        failure ->
+                                continueDetectionAfterFailure(
+                                        api,
+                                        fetch,
+                                        candidateIndex,
+                                        firstRejection,
+                                        unwrapCompletionFailure(failure)));
+    }
+
+    private static CompletableFuture<String> attemptCheckedBodyFrom(
+            String baseUrl, UnsignedPayloadFetch fetch) {
+        try {
+            return fetchCheckedBodyFrom(baseUrl, fetch);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private static String rememberApiBaseUrl(TesserApiConnection api, String baseUrl, String body) {
+        api.remember(baseUrl);
+        LOG.debug("Using Tesser API {} for this signer", baseUrl);
+        return body;
+    }
+
+    private static CompletableFuture<String> continueDetectionAfterFailure(
+            TesserApiConnection api,
+            UnsignedPayloadFetch fetch,
+            int candidateIndex,
+            Throwable firstRejection,
+            Throwable failure) {
+        boolean signingKeyNotAccepted = isSigningKeyNotAccepted(failure);
+        int nextCandidateIndex = candidateIndex + 1;
+        if (signingKeyNotAccepted && hasCandidate(api, nextCandidateIndex)) {
+            LOG.debug(
+                    "Tesser API {} did not accept the signing key; trying {}",
+                    api.candidateBaseUrls().get(candidateIndex),
+                    api.candidateBaseUrls().get(nextCandidateIndex));
+            return detectEnvironmentAndFetchCheckedBody(
+                    api, fetch, nextCandidateIndex, firstRejectionOr(firstRejection, failure));
+        }
+        return CompletableFuture.failedFuture(
+                new CompletionException(
+                        selectDetectionFailure(firstRejection, failure, signingKeyNotAccepted)));
+    }
+
+    private static boolean hasCandidate(TesserApiConnection api, int candidateIndex) {
+        return candidateIndex < api.candidateBaseUrls().size();
+    }
+
+    private static Throwable firstRejectionOr(Throwable firstRejection, Throwable failure) {
+        if (firstRejection != null) {
+            return firstRejection;
+        }
+        return failure;
+    }
+
+    private static Throwable selectDetectionFailure(
+            Throwable firstRejection, Throwable failure, boolean signingKeyNotAccepted) {
+        if (firstRejection == null) {
+            return failure;
+        }
+        if (signingKeyNotAccepted) {
+            firstRejection.addSuppressed(failure);
+            return firstRejection;
+        }
+        failure.addSuppressed(firstRejection);
+        return failure;
+    }
+
+    private static boolean isSigningKeyNotAccepted(Throwable failure) {
+        if (!(failure instanceof TesserError.APIError apiError)) {
+            return false;
+        }
+        return apiError.status() == UNAUTHORIZED_STATUS
+                && apiError.hasCode(SIGNING_KEY_NOT_ACCEPTED_ERROR_CODE);
+    }
+
+    private static CompletableFuture<String> fetchCheckedBodyFrom(
+            String baseUrl, UnsignedPayloadFetch fetch) {
+        UnsignedPayloadQuery query =
+                buildUnsignedPayloadQuery(fetch.signing(), fetch.params(), fetch.clock());
+        return fetch.stamp()
+                .stamp(fetch.signing(), buildCanonicalUnsignedPayloadMessage(query))
                 .thenCompose(
                         stamped ->
                                 sendUnsignedPayloadRequest(
-                                        api.httpClient(),
-                                        buildUnsignedPayloadRequest(api.baseUrl(), query, stamped)))
+                                        fetch.httpClient(),
+                                        buildUnsignedPayloadRequest(baseUrl, query, stamped)))
                 .thenApply(UnsignedPayload::parseUnsignedPayloadBody)
-                .thenApply(body -> assertUnsignedPayloadMatchesRequest(body, signing, params));
+                .thenApply(
+                        body ->
+                                assertUnsignedPayloadMatchesRequest(
+                                        body, fetch.signing(), fetch.params()));
     }
 
     private static UnsignedPayloadQuery buildUnsignedPayloadQuery(

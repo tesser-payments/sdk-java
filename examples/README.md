@@ -10,6 +10,10 @@ wired correctly on your machine.
 | [`sign-rebalance-step-webhooks`](./sign-rebalance-step-webhooks) | The full rebalance signing flow driven by Tesser webhooks: create a rebalance, receive the `step.signature_requested` and terminal step events, sign with `LocalSigner.signStep`, submit to `POST /v1/treasury/rebalances/{transferId}/steps/{stepId}/sign`. | Compile-verified only. Webhook delivery from Tesser staging is also currently unreliable, and webhook signature verification is intentionally skipped pending a documented algorithm. |
 | [`sign-rebalance-step-polling`](./sign-rebalance-step-polling) | Same rebalance signing flow as the webhooks variant but polls `GET /v1/treasury/rebalances/{id}` instead of waiting for webhook events. No tunnel, no webhook subscription. | Compile-verified only. Recommended over the webhook variant while webhook delivery is unreliable. |
 
+The examples build the signer without `apiBaseUrl`, so it finds the
+environment your signing key belongs to. `apiBaseUrl` is optional; pass it
+(`new LocalSigner(signing, apiBaseUrl)`) to use only that URL.
+
 Each example has its own README (or, for `create-wallet`, the walkthrough
 below) covering env setup, expected output, and troubleshooting.
 

@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+### Added
+
+- `apiBaseUrl` is optional again, and `new LocalSigner(signing)` is back,
+  along with `new LocalSigner(signing, httpClient)`. Code written for 0.0.3
+  compiles and runs unchanged.
+- Without `apiBaseUrl`, the first Ethereum `signCreateWallet` tries
+  production and, if production does not accept your signing key, sandbox,
+  and the signer remembers that environment for later calls. If neither
+  accepts your signing key, the `APIError` from production is thrown.
+
+### Changed
+
+- With `apiBaseUrl` set, behaviour is unchanged: only that URL is used.
+
+### Upgrade note
+
+- 0.0.x made no network requests. Ethereum wallet creation now needs outbound
+  HTTPS to `api.tesser.xyz`, and to `api-sandbox.tesser.xyz` for sandbox
+  signing keys.
+
 ## 0.1.0 - 2026-11-08
 
 ### Added
