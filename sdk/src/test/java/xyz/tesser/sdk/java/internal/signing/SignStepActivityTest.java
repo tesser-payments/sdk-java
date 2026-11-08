@@ -12,6 +12,8 @@ import java.util.Base64;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.LongSupplier;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import xyz.tesser.sdk.java.SignStepOptions;
 import xyz.tesser.sdk.java.SignedStepResult;
@@ -131,6 +133,31 @@ class SignStepActivityTest {
         verify(stamp).stamp(any(), bodyCaptor.capture());
         JsonNode params = Json.readTree(bodyCaptor.getValue()).get("parameters");
         assertThat(params.get("type").asText()).isEqualTo("TRANSACTION_TYPE_ETHEREUM");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"TEMPO", "TEMPO_MODERATO"})
+    void tempoNetworksStampTheTempoTypeAndPreserveTheTransaction(String network) throws Exception {
+        StepForSigning tempoStep =
+                new StepForSigning(
+                        STEP.id(), STEP.transferId(), "0x76deadbeef", STEP.signWith(), network);
+        Stamp stamp = stubStamp();
+        ArgumentCaptor<String> bodyCaptor = ArgumentCaptor.forClass(String.class);
+
+        SignedStepResult result =
+                SignStepActivity.sign(CFG, tempoStep, new SignStepOptions(), stamp, FIXED_CLOCK)
+                        .get();
+
+        verify(stamp).stamp(any(), bodyCaptor.capture());
+        assertThat(result.metadata().body()).isEqualTo(bodyCaptor.getValue());
+        assertThat(result.unsignedTransaction()).isEqualTo(tempoStep.unsignedTransaction());
+        JsonNode stamped = Json.readTree(bodyCaptor.getValue());
+        assertThat(stamped.get("type").asText()).isEqualTo("ACTIVITY_TYPE_SIGN_TRANSACTION_V2");
+        JsonNode params = stamped.get("parameters");
+        assertThat(params.get("type").asText()).isEqualTo("TRANSACTION_TYPE_TEMPO");
+        assertThat(params.get("signWith").asText()).isEqualTo(tempoStep.signWith());
+        assertThat(params.get("unsignedTransaction").asText())
+                .isEqualTo(tempoStep.unsignedTransaction());
     }
 
     @Test

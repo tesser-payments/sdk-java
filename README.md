@@ -142,6 +142,17 @@ try {
 }
 ```
 
+## Tempo transfers
+
+1. Pass the Tempo transaction Tesser provides (`0x76...`), your wallet
+   address, and `TEMPO` or `TEMPO_MODERATO` in `StepForSigning` to
+   `LocalSigner.signStep(...)`.
+2. The SDK authorizes the transaction with your API key, without changing
+   it. Submit the returned `signature` to the Tesser signing endpoint.
+3. Tesser completes the transfer, broadcasts it, and pays the network fee.
+
+Unknown networks fail with `TesserError.ConfigError` before anything is signed.
+
 ## Reporting a vulnerability
 
 See [SECURITY.md](./SECURITY.md). Please do not open a public issue for a

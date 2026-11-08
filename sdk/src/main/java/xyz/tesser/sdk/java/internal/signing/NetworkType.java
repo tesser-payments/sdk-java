@@ -8,9 +8,6 @@ import xyz.tesser.sdk.java.error.TesserError;
  * Maps a Tesser network identifier ({@code step.from_network} / {@code step.to_network}) to the
  * Turnkey {@code TRANSACTION_TYPE_*} used in {@code parameters.type} of an {@code
  * ACTIVITY_TYPE_SIGN_TRANSACTION_V2} activity.
- *
- * <p>EVM-family networks all map to {@code TRANSACTION_TYPE_ETHEREUM} because Turnkey keys the type
- * by signing scheme, not by chain ID.
  */
 public final class NetworkType {
 
@@ -23,7 +20,8 @@ public final class NetworkType {
                     "POLYGON", "TRANSACTION_TYPE_ETHEREUM",
                     "POLYGON_AMOY", "TRANSACTION_TYPE_ETHEREUM",
                     "SOLANA", "TRANSACTION_TYPE_SOLANA",
-                    "TEMPO", "TRANSACTION_TYPE_ETHEREUM");
+                    "TEMPO", "TRANSACTION_TYPE_TEMPO",
+                    "TEMPO_MODERATO", "TRANSACTION_TYPE_TEMPO");
 
     private NetworkType() {}
 
