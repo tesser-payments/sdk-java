@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Deprecated
+
+- `TesserErrorDetail.uiMessage()`. `ui_message` is meant for Tesser's
+  dashboard, and the Tesser API will stop returning it to API-key requests on
+  a date to be announced. It is still parsed when present; after that date
+  `uiMessage()` will return `null`. Use `errorMessage()` instead, and
+  `errorCode()` for logic.
+
 ## 0.2.0 - 2026-11-08
 
 ### Added
