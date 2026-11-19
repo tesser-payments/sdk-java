@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-11-19
+
 ### Deprecated
 
 - `TesserErrorDetail.uiMessage()`. `ui_message` is meant for Tesser's
