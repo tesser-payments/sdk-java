@@ -10,7 +10,7 @@ Tesser API. Targets Java 17+.
 
 ```kotlin
 dependencies {
-    implementation("xyz.tesser:sdk-java:0.2.0")
+    implementation("xyz.tesser:sdk-java:0.2.1")
 }
 ```
 
@@ -20,7 +20,7 @@ dependencies {
 <dependency>
     <groupId>xyz.tesser</groupId>
     <artifactId>sdk-java</artifactId>
-    <version>0.2.0</version>
+    <version>0.2.1</version>
 </dependency>
 ```
 
